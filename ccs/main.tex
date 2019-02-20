@@ -1,0 +1,73 @@
+\PassOptionsToPackage{warn}{textcomp}
+\documentclass[sigconf, anonymous]{acmart}
+
+\input{Compilation/preamble}
+
+
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+
+%resize table box
+\usepackage{graphicx}
+
+\usepackage{xcolor}
+
+\lstdefinestyle{base}{
+  language=C,
+  emptylines=1,
+  breaklines=true,
+  basicstyle=\ttfamily\color{black}\tiny,
+  moredelim=**[is][\color{red}]{@}{@},
+}
+
+\fancyhf{} % Remove fancy page headers 
+\fancyhead[C]{Anonymous submission \#9999 to ACM CCS 2018} % TODO: replace 9999 with your paper number
+\fancyfoot[C]{\thepage}
+
+\linespread{1}
+\setcopyright{none} % No copyright notice required for submissions
+\acmConference[Submission to ACM CCS 2018]{ACM Conference on Computer and Communications Security}{Due 8 May 2018}{Toronto, Canada}
+\acmYear{2017}
+
+\settopmatter{printacmref=false, printccs=true, printfolios=true} % We want page numbers on submissions
+
+%%\ccsPaper{9999} % TODO: replace with your paper number once obtained
+
+\begin{document}
+\sloppy
+
+\title{Kernel TOCTOU mitigation}
+
+\maketitle
+
+\input{sources/abstract}
+
+\begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10002978.10003006.10003007</concept_id>
+<concept_desc>Security and privacy~Operating systems security</concept_desc>
+<concept_significance>300</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[300]{Security and privacy~Operating systems security}
+
+\keywords{toctou, time-to-check-to-time-to-use} 
+
+\input{sources/introduction}
+\input{sources/background}
+\input{sources/design}
+\input{sources/implementation}
+\input{sources/evaluation}
+\input{sources/limitationfuturework}
+\input{sources/relatedwork}
+\input{sources/conclusions}
+%\section*{Acknowledgment}
+
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{bib}  
+
+\end{document}
