@@ -1,0 +1,54 @@
+\documentclass[sigconf, anonymous]{acmart}
+
+
+%packages
+\usepackage{listings}
+\usepackage{algorithm, algpseudocode}
+%packages
+
+\input{common/preamble}
+\input{common/listings}
+
+
+
+
+
+\fancyhf{} % Remove fancy page headers 
+\fancyhead[C]{Anonymous submission \#9999 to ACM CCS 2017} % TODO: replace 9999 with your paper number
+\fancyfoot[C]{\thepage}
+
+\setcopyright{none} % No copyright notice required for submissions
+\acmConference[Anonymous Submission to ACM CCS 2017]{ACM Conference on Computer and Communications Security}{Due 19 May 2017}{Dallas, Texas}
+\acmYear{2017}
+
+\settopmatter{printacmref=false, printccs=true, printfolios=true} % We want page numbers on submissions
+
+
+%%\ccsPaper{9999} % TODO: replace with your paper number once obtained
+
+
+
+
+\title{Kernel TOCTOU Mitigation}
+
+\begin{document}
+
+\maketitle
+
+
+\input{sources/abstract}
+\input{sources/introduction}
+\input{sources/background}
+\input{sources/design}
+\input{sources/implementation}
+\input{sources/evaluation}
+\input{sources/limitationfuturework}
+\input{sources/relatedwork}
+\input{sources/conclusions}
+
+
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{bib} 
+
+\end{document}
