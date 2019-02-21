@@ -125,11 +125,11 @@ In Windows operating system, instead of process, thread is the base unit for tas
 
 "MOV from/to CR3" is one of the instructions that cause VM exits when they are executed in VMX non-root operation(guest mode). For example, "MOV CR3, EAX", where general register EAX contains the new page directory address, indicates an on going process context switch.
 
-Our hypervisor handles VM exits and compare the new CR3 value with the ones that need to be monitored. If match, it sets the SMAP bit in the CR4 of VMCS(Virtual Machine Control Structure) so that when the VM resumes, the new value can be updated to the processor's CR4. Correspondingly, when the monitored processes are switched out, hypervisor does the opposite, clearing the SMAP bit. In such a way, the SMAP feature is only enabled in certain processes, as shown in~\autoref{fig:processsmap}.
+Our hypervisor handles VM exits and compare the new CR3 value with the ones that need to be monitored. If match, it sets the SMAP bit in the CR4 of VMCS(Virtual Machine Control Structure) so that when the VM resumes, the new value can be updated to the processor's CR4. Correspondingly, when the monitored processes are switched out, hypervisor does the opposite, clearing the SMAP bit. In such a way, the SMAP feature is only enabled in certain processes, as shown in~\autoref{fig:processmap}.
 
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/processsmap}
+  \includegraphics[width=0.47\textwidth]{figures/processmap}
   \centering
   \caption{SMAP is only enabled on the target process. In other words, only target process can trigger SMAP exceptions.}
-  \label{fig:processsmap}
+  \label{fig:processmap}
 \end{figure}
