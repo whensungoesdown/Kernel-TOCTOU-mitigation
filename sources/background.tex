@@ -118,6 +118,7 @@ Listing~\ref{lst:vulnerablecode} shows an snippet of Windows kernel code~\cite{j
 The timing need to be perfect, or the attacker can do it multiple times until success. It's possible to conduct this attack on both single processor system and multiple processor system. The latter is preferable and actually it's a more common setting nowadays, but this attack can happen on a single processor system too. For example, technique such as trying to make a context switch between UserAllocPoolWithQuota() and RtlCopyMemory().
 
 On multiple processor system, the attacker could create another thread and attach it to a specific processor. As shown in~\autoref{fig:toctouasm}, the attacking thread keeps flipping the variable's bit in a loop, try to feed the two values into the vulnerable function during the time window.
+If the timing is not accurate or maybe the attacker flips too many times, the kernel won't crash, only when the first fetch get a smaller value and the second fetch get a larger value, the vulnerability will be triggered.
 
 \begin{figure}[h]
   \includegraphics[width=0.47\textwidth]{figures/toctouasm}
@@ -130,12 +131,18 @@ On multiple processor system, the attacker could create another thread and attac
 Once this step is accomplished, the problem becomes how to exploit it a classic heap buffer overflow. So you can see that kernel TOCTOU itself may not seems to be harmful, but it could lead to something serious. 
 
 \subsection{Supervisor Mode Access Prevention (SMAP)}
-SMAP is a security feature of Intel processors since Broadwell microarchitecture. It prevents operating system kernel accessing user-mode memory directly, such accesses will raise an exception. This makes it harder for attackers to "trick" the kernel into using instructions or data from a user-mode program. 
+Kernel TOCTOU only needs accurate timing and memory writing, it's too plain to trigger any security mechanism so far. Existed monitoring methods are either too slow or too narrow, more details in~\autoref{sec:relatedwork}. We found a Intel CPU feature, Supervisor Mode Access Prevention (SMAP) is suitable for this task. 
 
-Kernel code reads and writes user-mode data are commonplace. It's inevitable because user programs need to provide parameters to system calls. Therefore, two new instructions "STAC" and "CLAC" are provided to disable SMAP temporarily, giving opportunity for kernel to retrieve user data in a controllable way.
+It's a security feature since Broadwell microarchitecture. It prevents operating system kernel directly accessing user-mode memory, which raises an exception. The intension is to stop transferring malicious payload from user space to kernel space.
 
-Linux kernel support for SMAP since version 3.7. All the accesses to user mode memory must go through two gateway functions copy\_to\_user() and copy\_from\_user(), where SMAP is temporarily disabled.
+%This makes it harder for attackers to "trick" the kernel into using instructions or data from a user-mode program. 
 
-Windows doesn't support SMAP yet. Different from Linux's approach, each of Windows system calls tends to "probe" and "capture" user-mode data itself. Probing usually done by function ProbeForRead()~\cite{probeforread} and ProbeForWrite() to check the validity of the buffers, it also checks if a user-mode buffer actually resides in the user-mode address space by simply compare its address to a pre-defined value. Since some modules such as win32k.sys are highly coupled with user-mode components, it will cost huge engineering effort to change the way it retrieve user-mode data.
+Also because kennel does need to legally get data from user space, two more new instructions are provided to accomplish that. "STAC"/"CLAC" are to disable/enable SMAP temporarily. The idea is that the kernel should be aware of when it's doing so. 
+
+%Kernel code reads and writes user-mode data are commonplace. It's inevitable because user programs need to provide parameters to system calls. Therefore, two new instructions "STAC" and "CLAC" are provided to disable SMAP temporarily, giving opportunity for kernel to retrieve user data in a controllable way.
+
+For example, Linux kernel support for SMAP since version 3.7. All the accesses to user mode memory must go through two gateway functions copy\_to\_user() and copy\_from\_user(), where SMAP is temporarily disabled.
+
+However, Windows doesn't support SMAP yet. Different from Linux's approach, each of Windows syscalls tends to "probe" and "capture" user-mode data itself. Probing usually done by function ProbeForRead()~\cite{probeforread} and ProbeForWrite() to check the validity of the buffers, it also checks if a user mode buffer actually resides in the user space by simply compare its address to a pre-defined value. Since some modules such as win32k.sys are highly coupled with user-mode components, it will cost huge engineering effort to change the way it retrieve user-mode data.
 
 In Linux, even though copy\_*\_user() is mandated~\cite{corbet2012linuxsmap}, it still suffers from TOCTOU vulnerability such as mistake of using function copy\_from\_user() twice for the same variable~\cite{double-fetch-linux}. 
