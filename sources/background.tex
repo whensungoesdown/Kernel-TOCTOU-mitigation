@@ -30,7 +30,7 @@ So we call it kernel TOCTOU vulnerability. It works as following. The attacker f
 
 To the best of our knowledge, this is the first study that proposes a new run-time mitigation for kernel TOCTOU vulnerability. 
 
-\subsection{Kernel TOCTOU/double fetch vulnerability}
+\subsection{Kernel TOCTOU Vulnerability}
 
 Modern operating system such as Windows and Linux usually has two modes of operation, kernel mode and user mode. Operating system's kernel runs in kernel mode, it has complete access to all of the computer's hardware, and it controls the switching between the CPU modes. Kernel provides most of the system's functionality including file system, network, scheduling, displaying and etc., through hundreds of "system calls". System calls provide an essential interface between a process and the operating system. The rest of the programs runs in user mode. 
 
@@ -40,8 +40,8 @@ Therefore, it's dangerous for the kernel to reference any user-mode data directl
 
 %The number of kernel TOCTOU vulnerability has been increasing recently. For example, the kernel mode graphic subsystem of Windows operating system, It interacts with user-mode variables frequently. The following table is the vulnerabilities that found in recent years.
 
-Kernel TOCTOU vulnerabilities are found among many commercial operating system kernels such as Windows, Linux and etc.
-
+Kernel TOCTOU vulnerabilities are found among many commercial operating system kernels such as Windows, Linux and etc. A few of them are listed in
+~\autoref{table:cves}.
 
 \begin{center}
 \begin{table}
@@ -113,11 +113,11 @@ void win32k_function(... LPARAM @lParam@, ...)
 
 \end{lstlisting}
 
-Listing~\ref{lst:vulnerablecode} shows an snippet of Windows device driver code~\cite{jurczyk2013identifying} that a buffer first allocated from kernel heap, whose size is determined from a variable resides in user-mode, and later reuses that variable as a parameter in a "RtlCopyMemory" call. This is a piece of pseudo code that mimic the vulnerability that has been patched in ms08-061. "my\_struct-$>$cbData" appears two times, referencing user-mode variable, one is to determine the size of the kernel buffer (first fetch), the other is to use it as the length of data(second fetch). Since variable resides in user-mode memory could be modified by other threads, later, "my\_struct-$>$cbData" could be set to a larger value, introducing a potential kernel pool buffer overflow.
+Listing~\ref{lst:vulnerablecode} shows an snippet of Windows kernel code~\cite{jurczyk2013identifying}. A buffer first being allocated from kernel heap, and its size is determined from a user-mode variable. Later that user mode variable has been used again as a parameter to RtlCopyMemory(). This pseudo code mimics a vulnerability that has been identified and patched in ms08-061. More specifically, parameter "lParam" is provided by user program when calling win32k\_function(), it points to a data structure "my\_struct" which could be located in user space (Actually there is some validation in the wrapper function, but it can be bypassed.). Even though the value of "lParam" could not be changed, the data field "cbData" can. Notice that "my\_struct"-$>$cdData appears twice, first when allocating a buffer, the next time is when copying the buffer. During the time window, if the attacker changes "my\_struct"-$>$cbData to a larger value, it will cause a kernel pool buffer overflow. 
 
-This attack can happen on both single processor system and multiple processor system. On a single processor system, even though only one thread can be scheduled to execute on the processor at a time, it's still possible to trigger the vulnerability. For example, between function calls UserAllocPoolWithQuota and RtlCopyMemory, if a thread context switch happens in between, other threads can have the opportunity to modified it.
+The timing need to be perfect, or the attacker can do it multiple times until success. It's possible to conduct this attack on both single processor system and multiple processor system. The latter is preferable and actually it's a more common setting nowadays, but this attack can happen on a single processor system too. For example, technique such as trying to make a context switch between UserAllocPoolWithQuota() and RtlCopyMemory().
 
-A multiple processor environment is much more favorable to attackers. It's commonplace for both laptops or servers nowadays. Under such conditions, the attacker creates an attacking thread and use thread affinity masks to attach it to other processors. As shown in~\autoref{fig:toctouasm}. The attacking thread keeps flipping the vulnerable variable in a loop, high chance that it can successfully enlarge it during the time window. In this paper we assume the attacker captures the time window and corrupts the vulnerable value as intended. 
+On multiple processor system, the attacker could create another thread and attach it to a specific processor. As shown in~\autoref{fig:toctouasm}, the attacking thread keeps flipping the variable's bit in a loop, try to feed the two values into the vulnerable function during the time window.
 
 \begin{figure}[h]
   \includegraphics[width=0.47\textwidth]{figures/toctouasm}
@@ -126,6 +126,8 @@ A multiple processor environment is much more favorable to attackers. It's commo
   \label{fig:toctouasm}
 \end{figure}
 
+
+Once this step is accomplished, the problem becomes how to exploit it a classic heap buffer overflow. So you can see that kernel TOCTOU itself may not seems to be harmful, but it could lead to something serious. 
 
 \subsection{Supervisor Mode Access Prevention (SMAP)}
 SMAP is a security feature of Intel processors since Broadwell microarchitecture. It prevents operating system kernel accessing user-mode memory directly, such accesses will raise an exception. This makes it harder for attackers to "trick" the kernel into using instructions or data from a user-mode program. 
