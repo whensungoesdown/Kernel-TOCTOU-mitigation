@@ -10,7 +10,7 @@ This issue has been addressed by many research work ~\cite{dean2004fixing}~\cite
 
 
 %\begin{lstlisting}[basicstyle=\small,style=redkeyword]
-\begin{lstlisting}[basicstyle=\normalsize,style=redkeyword]
+\begin{lstlisting}[style=code]
 if (access(pathname, R\_OK) == 0)
     if ((fd = open(pathname, O\_RDONLY)) == 0) ...
 \end{lstlisting}
@@ -45,9 +45,12 @@ Kernel TOCTOU vulnerabilities are found among many commercial operating system k
 
 \begin{center}
 \begin{table}
+%\singlespacing
+\scalebox{0.8}{
 \begin{tabular}{||c c c||}
 \hline
-Id & Affected System & Vendor \\
+Id & Affected System & Vendor \\ [0.5ex]
+\hline
 \hline
 CVE-2008-2252 & Windows & Microsoft \\
 CVE-2013-1280 & Windows & Microsoft \\
@@ -66,7 +69,7 @@ CVE-2016-7624 & macOS & Apple \\
 CVE-2017-7115 & iOS & Apple \\
 \hline
 
-\end{tabular}
+\end{tabular}}
 \caption{Some of the kernel TOCTOU vulnerabilities.}
 \label{table:cves}
 \end{table}
@@ -87,21 +90,17 @@ CVE-2017-7115 & iOS & Apple \\
 
 
 %lst:vulnerablecode
-\begin{lstlisting}[basicstyle=\small,style=redkeyword,caption={An snippet of Windows device driver code that mimic the vulnerability that fixed in ms08-061. The vulnerable user-mode variable is marked in red.}\label{lst:vulnerablecode}]
-
+\begin{lstlisting}[style=code,caption={An snippet of Windows device driver code that mimic the vulnerability that fixed in ms08-061. The vulnerable user-mode variable is marked in red.}\label{lst:vulnerablecode}, captionpos=b]
 // lParam points to data located in user space
-
 void win32k_function(... LPARAM @lParam@, ...) 
 {
     DWORD cbCapture;
     ...
-
     @my_struct@ = (PMY_STRUCT)@lParam@;
 
     // first fetch
     cbCapture = sizeof(MY_STRUCT) + @my_struct->cbData@;  
     ...
-
     pNew = UserAllocPoolWithQuota(cbCapture, TAG_SMS_CAPTURE)
     if (pNew != NULL) 
     {

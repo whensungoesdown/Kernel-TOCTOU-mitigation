@@ -5,3 +5,29 @@
 	basicstyle=\ttfamily\color{black}\tiny,
 	moredelim=**[is][\color{red}]{@}{@},
 }
+
+\lstdefinestyle{code}{
+	language=Matlab,
+	emptylines=1,
+	breaklines=true,
+	basicstyle=\ttfamily\color{black}\footnotesize\linespread{0.3},
+	numbers=left,
+	xleftmargin=2em,
+	numbersep=5pt,
+	stepnumber=1,
+	showstringspaces=false,
+	tabsize=1,
+	breakatwhitespace=false,
+	moredelim=**[is][\color{red}]{@}{@},
+}
+
+% this affects all the lstlisting
+\begin{comment}
+\lstset{
+	basicstyle=\ttyfamily,
+	columns=fullflexible,
+	frame=single
+	breaklines=true,
+	postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+}
+\end{comment}
