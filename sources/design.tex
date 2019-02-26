@@ -58,12 +58,8 @@ To address this issue, user reading and user writing should be treated separatel
 Kernel reads/writes and user reads make the page transit from spaces and change attributes. The challenge remain is to handle user writes. 
 
 
-\subsection{Solving Write Conflict }
-Subject to the x86 architecture, the hardware mechanism works only on page granularity.
-
-For practical mitigations, compatibility is important. There are cases that program writes shared data or writes the data of the same page. Under the protection we just mentioned, such write access will trigger a page fault and causes thread exit. No synchronizing mechanism for shared resource, for example, user memory which is the root cause of kernel TOCTOU vulnerability. 
-
-Since pages only be protected during the current system call, our solution is to hold the write thread, waiting for the system call to end. "Hold" means the write thread will give up it's time slice, letting operating system re-scheduling. 
+\subsection{Handling Write Conflicts}
+Subject to the x86 architecture, the hardware mechanism works only on page granularity, meaning one page can't be partially protected. So our approach is the following. Since pages only need to be protected during the ongoing syscall, when a thread tries to write data during the time, we make the thread wait until the ongoing syscall ends. More specifically, the thread waits inside the page fault handler, giving up it's CPU time slice. 
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/reexecute}
@@ -72,7 +68,8 @@ Since pages only be protected during the current system call, our solution is to
   \label{fig:reexecute}
 \end{figure}
 
-As shown in~\autoref{fig:reexecute}, Thread 1 is trying to access a protected page. Instead of terminating it, we hold it in the context of page fault exception, specifically, calling KeDelayExecutionThread() to put it to "sleep". But only for a certain amount of time, then it checks whether the page now is writable. If so, the page fault handler finish this exception and re-execute the fault instruction, otherwise, it waits for another round. A threshold is set to prevent infinite waiting. For example, after ten times, the thread will be terminated.
+
+As shown in~\autoref{fig:reexecute}, thread 0 invoke a syscall. The kernel gets data from a user page, because of the mitigation, this page is protected. Then thread 1 tries to write it. It causes a page fault exception. From the error code our page fault handler is able to tell that this is a writing request, so it can't be granted. By calling a windows kernel function KeDelayExecutionTread(), the current thread gets into "sleep". After certain amount of time, it wakes up and checks if the page is released. If so, the page fault handler finish this exception and re-execute the faulting instruction. Otherwise, it sleeps again. A retry threshold is set in order to avoid deadlocks, for example, after ten tries, the thread will be terminated.  
 
 \subsubsection{Differences between Exception and Interruption}
 
