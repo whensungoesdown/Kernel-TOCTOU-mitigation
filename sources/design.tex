@@ -3,21 +3,21 @@
 \section{Design}
 \label{sec:design}
 
-In this section, we present the design of our project. It consists of two major components: the main module and a hypervisor module. The main module intercepts page faults, handling the ones that caused by SMAP, and change/restore page permits, making them temporarily unwritable. There is a thin hypervisor loaded as a kernel module as well. It isolates the effects of SMAP which is global to the entire system.
+In this section, we present the design of our project. It has two major parts, the main module setups SMAP environment, monitors kernel to user space accesses, intercepts and handles related page faults and makes the page attributes transitioning. The other part is the hypervisor. As briefly mentioned in the introduction, the hypervisor in charges of isolating the SMAP feature to certain processes.
 
-\subsection{Monitoring User Memory Accesses}
+\subsection{Monitoring Kernel to User Space Accesses}
 
-The key intuition is that the user-mode memory which is providing parameters during a system call should not be tampered with by other user-mode threads. 
-The main problem is how to monitor memory accesses, particularly, user-mode memory accesses that initiated in kernel-mode.  There are different ways to monitor as we will later discuss in~\autoref{sec:limitation}, but the major concern is the efficiency.
+This is the major issue we faced when addressing kernel TOCTOU vulnerability. Reading and writing memory is the most common operation that a computer system does. So even with virtualization technology, there is no trap event on accessing memory. However, what makes the kernel TOCTOU vulnerability special is the fact that it's always the case that the kernel accesses user space. So we employ SMAP to monitor such behavior. 
 
-We find that SMAP provides an excellent choice for monitoring. It only raises an exception when kernel-mode code accesses user-mode pages. To receive notice, we intercepts the page fault handling routine by replacing the corresponding vector of system's IDT table with our handler. It handles all the page fault exceptions  of several reasons. We pick up the ones that caused by SMAP and the ones that introduced by our subsequence actions. By design, a SMAP exception raised indicates a serious violation of system policy. Kernel should stop there to prevent further compromising. To leverage SMAP, care must be taken by kernel because it needs to regulate access to user-mode parameters through legitimate access functions, for example, copy\_to\_user(), copy\_from\_user(), and use new instructions CLAC/STAC to temporary disable/enable SMAP for those legitimate accesses~\cite{corbet2012linuxsmap}. Windows operating system didn't use SMAP, such exception is alien to it. 
+Because there is no reasons for the user parameters to change during the ongoing syscall, we should make them unchangeable. For now, due to the practical reason that SMAP works on page granularity, we protect all the pages that contain the user parameters from being tampered with. Conflicts caused by this will be solved later in this section.
 
-We leverage SMAP in a very different way, we only need it to give notice to those memory accesses that meet the criteria. It's common that Windows kernel reads user-mode parameters directly, hence the SMAP exceptions need to be properly handled. 
+As mentioned earlier, once SMAP enabled, kernel accessing user space triggers page fault exceptions, so we intercepts OS's page fault handler. But the handler needs to handle all the exceptions in the system, it's a efficiency critical component. So the first thing we need to do is to distinguish the ones that caused by SMAP or by our subsequent protection. Notice that SMAP is a very strict rule. For example, in Linux system, the two user-data-access functions copy\_to\_user() and copy\_from\_user() temporarily disable SMAP right before accessing user space and re-enable it right after. That means the system should not seen any SMAP caused exception. Once there is one, the Linux kernel will take it as a serious error, then panic. The same with Windows, it didn't support SMAP yet, it also crashes when sees such exceptions.
 
-To cease the current exception and subsequent ones that on the same page, we set the page to kernel-mode. By doing this, it not only satisfies the kennel's continuing access but also temporarily being protected from other user threads.
+Even though Intel provides two new instructions CLAC/STAC to temporarily disable/enable the feature, in page fault handler, it's already too late to cancel it.
 
+Now we have a efficient hardware mechanism that can inform us whenever there is a kernel-to-user access. The rest is to protect the pages and to let the system continue. We choose to put the faulting page into the kernel space by setting the attributes in theirs Page Table Entrys(PTE). By doing so, the page fault exception is handled because it's no longer kernel accessing a user page, also the faulting page is protected from other user threads. 
 
-\subsection{Page Attributes Conversion}
+\subsection{Page Attributes Transition} % or conversion? Or something else?
 
 
 The memory management unit(MMU) in x86 architecture has levels of page tables which establish the mappings between virtual and physical pages~\cite{intelpaging}. Each page has a corresponding page table entry(PTE). It contains bits that describe the page's attribute. As shown in~\autoref{fig:pte}, the 'User/Supervisor' bit, controls access to the page based on privilege level. If the bit is set, then this page is considered in user-mode space and be accessed by all code; if the bit is not set, then this page is consider in kernel-mode space and can be accessed only by kernel mode code.
