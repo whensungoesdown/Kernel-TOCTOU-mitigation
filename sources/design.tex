@@ -15,13 +15,12 @@ As mentioned earlier, once SMAP enabled, kernel accessing user space triggers pa
 
 Even though Intel provides two new instructions CLAC/STAC to temporarily disable/enable the feature, in page fault handler, it's already too late to cancel it.
 
-Now we have a efficient hardware mechanism that can inform us whenever there is a kernel-to-user access. The rest is to protect the pages and to let the system continue. We choose to put the faulting page into the kernel space by setting the attributes in theirs Page Table Entrys(PTE). By doing so, the page fault exception is handled because it's no longer kernel accessing a user page, also the faulting page is protected from other user threads. 
+Now we have a efficient hardware mechanism that can inform us whenever there is a kernel-to-user access. The rest is to protect the pages and to let the system continue. We choose to put the faulting page into the kernel space by setting the attributes in theirs page table entries(PTE). By doing so, the page fault exception is handled because it's no longer kernel accessing a user page, also the faulting page is protected from other user threads. 
 
-\subsection{Page Attributes Transition} % or conversion? Or something else?
+\subsection{Page Attribute Transition} % transition or conversion? Or something else?
 
 
-The memory management unit(MMU) in x86 architecture has levels of page tables which establish the mappings between virtual and physical pages~\cite{intelpaging}. Each page has a corresponding page table entry(PTE). It contains bits that describe the page's attribute. As shown in~\autoref{fig:pte}, the 'User/Supervisor' bit, controls access to the page based on privilege level. If the bit is set, then this page is considered in user-mode space and be accessed by all code; if the bit is not set, then this page is consider in kernel-mode space and can be accessed only by kernel mode code.
-
+The memory management unit(MMU) in x86 architecture use page tables to map between virtual and physical pages~\cite{intelpaging}. Every page in the virtual memory has corresponding page table entries. As shown in~\autoref{fig:pte}, it contains bits that describes the page. For example, whether a page belongs to kernel or user depends on the 'User/Supervisor' bit. If the bit is set, then this page is a user page; if not, it's a kernel page. Obviously, user pages can be accessed by both user code and kernel code, but kernel pages can only be accessed by kernel code. 
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/pte}
@@ -31,7 +30,9 @@ The memory management unit(MMU) in x86 architecture has levels of page tables wh
 \end{figure}
 
 
-When a page fault exception is raised, the faulting virtual address is always stored in the CR2(Control Register 2). To convert it to a kernel page, we simply locate it's PTE and set U/S bit to zero. It becomes part of the kernel space even though its address is not continuous with the traditional kernel address lower boundary such as 0x80000000. From this point, no other user-mode threads can access it, as shown in \autoref{fig:denyuserwrite}.
+When handling a page fault exception, the faulting virtual address is always stored in the CR2 register and the root of the current process's page tables is stored in CR3 register. First we need to walk through the page table to locate the corresponding page table entry of the faulting address. Then to put a user page into kernel space, simply changes the 'U/S' bit to 0. It becomes a kernel page even thought it's address doesn't look so, because normally on x86 Windows system, the kernel space is above address 0x80000000. We also can change it back by doing the opposite with the 'U/S' bit. We do so when the current syscall ends.
+
+When the page is in kernel space, it's protected from user code accesses, as shown in~\autoref{fig:denyuserwrite}.
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/denyuserwrite}
@@ -40,11 +41,11 @@ When a page fault exception is raised, the faulting virtual address is always st
   \label{fig:denyuserwrite}
 \end{figure}
 
-It's the basic model that sever the purpose of protecting user pages after kernel accesses them. Realistically, it's common that multiple threads access data that are located within the same page. For example, global data in the data segment, heap buffers and read-only data that merged with code, etc. One page being hold should not prevent other threads from reading it.
 
+This is the base of our model. In reality, it's common that other user threads try to access data within the same page. For example, global variables or heap data when threads share the same heap pool. Even there are cases where read-only data is merged into one section with code by the compiler. We need to handle these situations as well.
 
-To address that issue, we extent the policy of page fault handling. When user-mode threads try to read a protected page, the fact that the page is now part of kernel space will trigger a page fault exception. Instead of terminating  the thread as the operating system would do, we take over the exception, change the page back to user-mode, plus making it as read-only, then let the thread re-executing the faulting instruction. The read access should be granted. \autoref{fig:pagestate} shows the page's attribute changes due to different accesses.
- 
+To address this issue, user reading and user writing should be treated separately. Because reading doesn't change any data, it's safe to our mitigation. So when reading happens, we changes the page back to user space in order to fulfill the request. But we still want to remain its protection, because once we put it back, before another kernel access, this page is subject to any user access including writing. The solution is setting the page as read-only as well so subsequent writing triggers exception too. Certainly we record those information so when handling write violation we could behave accordingly and later restore the page attribute correctly. ~\autoref{fig:pagestate} shows the transitions due to different causes. 
+
 
 \begin{figure}[th]
   \includegraphics[width=0.45\textwidth]{figures/pagestate}
@@ -53,13 +54,12 @@ To address that issue, we extent the policy of page fault handling. When user-mo
   \label{fig:pagestate}
 \end{figure}
 
-As can be seen, the page either being part of the kernel space or stay read-only in user-mode. Meaning it can be read and written by kernel-mode code and be read by user-mode code. It only denies write accesses from user-mode, which is the root cause of kernel TOCTOU vulnerability.
 
-
-There will also be write conflicts when pages are under protection. Due to the design of x86 architecture, it's difficult to isolate data for different threads in a more fine-gain granularity than page level. Allowing other user-mode threads to write the same page means losing security boundary. Since solving it does has practical significance, we propose a method that try to satisfy the writing thread from the time dimension.
+Kernel reads/writes and user reads make the page transit from spaces and change attributes. The challenge remain is to handle user writes. 
 
 
 \subsection{Solving Write Conflict }
+Subject to the x86 architecture, the hardware mechanism works only on page granularity.
 
 For practical mitigations, compatibility is important. There are cases that program writes shared data or writes the data of the same page. Under the protection we just mentioned, such write access will trigger a page fault and causes thread exit. No synchronizing mechanism for shared resource, for example, user memory which is the root cause of kernel TOCTOU vulnerability. 
 
