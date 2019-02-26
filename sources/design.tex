@@ -71,17 +71,16 @@ Subject to the x86 architecture, the hardware mechanism works only on page granu
 
 As shown in~\autoref{fig:reexecute}, thread 0 invoke a syscall. The kernel gets data from a user page, because of the mitigation, this page is protected. Then thread 1 tries to write it. It causes a page fault exception. From the error code our page fault handler is able to tell that this is a writing request, so it can't be granted. By calling a windows kernel function KeDelayExecutionTread(), the current thread gets into "sleep". After certain amount of time, it wakes up and checks if the page is released. If so, the page fault handler finish this exception and re-execute the faulting instruction. Otherwise, it sleeps again. A retry threshold is set in order to avoid deadlocks, for example, after ten tries, the thread will be terminated.  
 
-\subsubsection{Differences between Exception and Interruption}
+\subsubsection{The Differences Between Interrupt and Exception}
 
-To explain why thread can wait in the context of page fault exception, we briefly review the difference between exception and interruption of x86 architecture.
+Sleeping inside the page fault handler sounds strange. To explain it, I should briefly talk about what are exception and interruption and what's the difference.
 
-In x86 architecture, external(hardware) interrupts, software interrupts and exceptions are all handled through the interrupt descriptor table (IDT). 
+Interrupt is a signal emitted by a peripheral hardware device such as network card, telling CPU that the device needs immediate attention. It's also called external interrupt or hardware interrupt(There is also software interrupt, but not discussed here). They have higher priority than the OS's scheduler and even higher than most of the kernel components. It's not suitable to put time consuming job in the interrupt handler. Any job that takes too long may even trigger the watchdog crash~\cite{msdnwatchdog}.   
 
-External interrupt is a signal from a device such as network card, keyboards, telling CPU that an event just happened, need CPU to handle it immediately. External interrupts from different devices have different priorities, but mostly they have a higher priority than operating system thread scheduler. Meaning operating system need to handle external interrupt before any user-mode program, even most of the kernel code. To put the processor wait inside an external interrupt handler is not a good  practice, it extremely affects system performance. Operating system finishes external interrupts as soon as possible, even the lengthy low-priority part of a task is deferred for later execution. For example, in Windows operating system such mechanism is called DPC(Deferred Procedure Call). A single long-running deferred procedure call will be detected and raise a BugCheck (DPC\_WATCHDOG\_VIOLATION). DPCs should not run longer than 100 microseconds and ISRs should not run longer than 25 microseconds~\cite{msdnwatchdog}. In such environment, thread scheduling is not feasible.
+On the other hand, exception is generated internally by the CPU, informing the OS to handle an event or an error, such as double fault, page fault, general protection fault and etc. In x86 architecture, external interrupts and exceptions are all handled through the Interrupt Descriptor Table(IDT), they all part of the kernel code. But unlike external interrupt, exception's priority is the same level with the OS scheduler. In Windows system's terminology, the Interrupt Request Level(IRQL) stays at PASSIVE\_LEVEL which also is the level where user program runs. So it's possible to safely call Windows kernel function KeDelayExecutionThread(), which has similar effect as a user program calls sleep(). 
 
-Software Interrupt is an interrupt that signaled by software using "INT" instruction, such as "INT 0x2e", "INT 0x80" for system calls. 
 
-What we leveraged in this project is exceptions. Exception is generated internally by the CPU to let the operating system handling an event or error such as double fault, page fault, general protection fault, etc. Different than external interruption, the priority of the exception handler is the same as the code that triggers the exception. Priority, in Windows operating system's term, is IRQL(Interrupt Request Level). When a user-mode program triggers a page fault exception, the control flow will be immediately transferred to the page fault handler which resides in the kernel, but the it's IRQL still stay at PASSIVE\_LEVEL which is the level where user program runs. Under PASSIVE\_LEVEL, thread scheduling is feasible.
+
 
 \subsection{Releasing Protected Pages}
 
@@ -102,6 +101,9 @@ When a system call ends, all the related pages that being protected should be re
 
 
 Protected pages should be released according to specific thread. Meaning, when one thread finishes a system call, only those pages that related to itself should be released. To distinguish different thread in a process, TEB (Thread Environment Block~\cite{teb}) could be used as an identifier. TEB describes the state of a thread. Each thread has its own TEB structure and it's address can be found through segment register FS (at FS:0x18) which points to different locations for each thread. 
+
+\subsection{TLB Caching}
+
 
 \subsection{Hypervisor}
 
