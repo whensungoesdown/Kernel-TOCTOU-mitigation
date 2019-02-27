@@ -80,12 +80,13 @@ Interrupt is a signal emitted by a peripheral hardware device such as network ca
 On the other hand, exception is generated internally by the CPU, informing the OS to handle an event or an error, such as double fault, page fault, general protection fault and etc. In x86 architecture, external interrupts and exceptions are all handled through the Interrupt Descriptor Table(IDT), they all part of the kernel code. But unlike external interrupt, exception's priority is the same level with the OS scheduler. In Windows system's terminology, the Interrupt Request Level(IRQL) stays at PASSIVE\_LEVEL which also is the level where user program runs. So it's possible to safely call Windows kernel function KeDelayExecutionThread(), which has similar effect as a user program calls sleep(). 
 
 
-
-
 \subsection{Releasing Protected Pages}
 
-When a system call ends, all the related pages that being protected should be released. Their attributes will be restored which set free other waiting threads. There original attributes are recorded not only for restore purpose but also used as ground truth when to decide how to handle a page fault.
+%When a system call ends, all the related pages that being protected should be released. Their attributes will be restored which set free other waiting threads. There original attributes are recorded not only for restore purpose but also used as ground truth when to decide how to handle a page fault.
 
+Whenever a syscall ends, all the protected page that related to it should be released. Their original attributes will be restored. The Thread Environment Block(TEB) is used to identify each thread within the current process. Each thread has its own TEB data and it's address is easy to locate by segment register FS. 
+
+We hook a Windows internal function in order to know when it's the end of the syscall. 
 
 \begin{comment}
 \begin{figure}[th]
@@ -100,7 +101,7 @@ When a system call ends, all the related pages that being protected should be re
 %We choose to install a hook near the end of system calls. On Windows operating system, such place could be, for example, KiServiceExit. Because during this function, Windows OS delivers pending APC~\cite{apc} which also needs to access user data. The hooking point that we choose is right after it calls KiDeliverAPC. It's not the very last instruction that the kernel mode execute, but we consider it close enough to the end of a system call.
 
 
-Protected pages should be released according to specific thread. Meaning, when one thread finishes a system call, only those pages that related to itself should be released. To distinguish different thread in a process, TEB (Thread Environment Block~\cite{teb}) could be used as an identifier. TEB describes the state of a thread. Each thread has its own TEB structure and it's address can be found through segment register FS (at FS:0x18) which points to different locations for each thread. 
+%Protected pages should be released according to specific thread. Meaning, when one thread finishes a system call, only those pages that related to itself should be released. To distinguish different thread in a process, TEB (Thread Environment Block~\cite{teb}) could be used as an identifier. TEB describes the state of a thread. Each thread has its own TEB structure and it's address can be found through segment register FS (at FS:0x18) which points to different locations for each thread. 
 
 \subsection{TLB Caching}
 
