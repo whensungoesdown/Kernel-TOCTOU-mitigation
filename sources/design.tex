@@ -82,8 +82,6 @@ On the other hand, exception is generated internally by the CPU, informing the O
 
 \subsection{Releasing Protected Pages}
 
-%When a system call ends, all the related pages that being protected should be released. Their attributes will be restored which set free other waiting threads. There original attributes are recorded not only for restore purpose but also used as ground truth when to decide how to handle a page fault.
-
 Whenever a syscall ends, all the protected page that related to it should be released. Their original attributes will be restored. The Thread Environment Block(TEB) is used to identify each thread within the current process. Each thread has its own TEB data and it's address is easy to locate by segment register FS. 
 
 We hook a Windows internal function in order to know when it's the end of the syscall. 
@@ -98,21 +96,22 @@ We hook a Windows internal function in order to know when it's the end of the sy
 \end{comment}
 
 
-%We choose to install a hook near the end of system calls. On Windows operating system, such place could be, for example, KiServiceExit. Because during this function, Windows OS delivers pending APC~\cite{apc} which also needs to access user data. The hooking point that we choose is right after it calls KiDeliverAPC. It's not the very last instruction that the kernel mode execute, but we consider it close enough to the end of a system call.
-
-
-%Protected pages should be released according to specific thread. Meaning, when one thread finishes a system call, only those pages that related to itself should be released. To distinguish different thread in a process, TEB (Thread Environment Block~\cite{teb}) could be used as an identifier. TEB describes the state of a thread. Each thread has its own TEB structure and it's address can be found through segment register FS (at FS:0x18) which points to different locations for each thread. 
 
 \subsection{TLB Caching}
 
 
 \subsection{Hypervisor}
 
-SMAP is a system wide feature. Due to the way Windows kernel retrieve user-mode parameters (continuous read of one buffer may even cause a series of exceptions), huge amount of exception is expected. Also, SMAP caused exception needs proper handling, it can't be passed to operating system. Moreover, page fault is one of the core mechanism that builds up MMU of x86 architecture. Its handler is highly optimized to handle tremendous amount of exceptions, even a few more instructions introduced may affect system's performance.  To eliminate unnecessary system overhead, we provide a thin hypervisor that only enables SMAP on certain processes.
+In the experiment, when we first enable SMAP in Windows system, exceptions flooded. Because Windows is not regulated itself as SMAP required, so every process, almost every syscall triggers SMAP caused page fault exception. And there is no easy way to simply discard them, even attached debugger is froze. To make it possible to just focus one case at a time, we figured a mechanism that can isolate SMAP inside a small range is necessary.
 
-Not all the processes need to be monitored, such as the ones that already run with administrator or system privilege. Because kernel TOCTOU vulnerabilities are mostly used to escalate privilege. Normally, services that may potentially be controlled locally or remotely by attackers and alien processes are the suspects of privilege escalation attacks.
+Eventually we chose to use virtualization technology, a hypervisor, to isolate a CPU feature such as SMAP into particular processes. Because hypervisor cost performance overhead, but in cloud computing environment nowadays, hypervisor is already in the settings.
 
-The hypervisor is simple and efficient. It's loaded as a Windows kernel driver at runtime, so the operating system doesn't need to change the way it boots. It only lifts the running operating system into VMM guest mode in order to intercept system events and change system's behavior. No hardware emulation is needed.  
+Hypervisor or virtual machine monitor(VMM) has several types. For example, native or bare-metal hypervisor, these hypervisors run directly on the host's hardware to control the hardware and to manage guest operating systems. Xen, Microsoft Hyper-V and VMware ESXi are this kind. Hosted hypervisor, these hypervisors run on a conventional operating system just as other programs do. VMware Workstation and QEMU are examples of this type.
+
+But the hypervisor we use is none of these. It's a very simple and efficient. It doesn't emulate any hardware device but just monitors events of the system~\cite{howtohide}. Intel's virtualization technology makes it possible to transfer a running system from non-virtualization environment into the VMM guest mode. Our hypervisor is loaded as a Windows kernel driver at runtime. It sets up and enters virtualization, lifts the running OS into guest mode, and itself becomes the hypervisor which monitors system events.  
+
+Also based on efficiency considerations, page fault handling is a highly optimized component. It's meaningful to reduce exceptions that being introduced by SMAP. As mentioned earlier, not all processes in the system need to be monitored. So the hypervisor framework that making a system-wide feature customizable is also one contribution of this paper. 
+
 
 \subsubsection{Process Context Switch}
 
