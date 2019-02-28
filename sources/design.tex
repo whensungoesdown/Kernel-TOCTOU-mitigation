@@ -71,7 +71,7 @@ Subject to the x86 architecture, the hardware mechanism works only on page granu
 
 As shown in~\autoref{fig:reexecute}, thread 0 invoke a syscall. The kernel gets data from a user page, because of the mitigation, this page is protected. Then thread 1 tries to write it. It causes a page fault exception. From the error code our page fault handler is able to tell that this is a writing request, so it can't be granted. By calling a windows kernel function KeDelayExecutionTread(), the current thread gets into "sleep". After certain amount of time, it wakes up and checks if the page is released. If so, the page fault handler finish this exception and re-execute the faulting instruction. Otherwise, it sleeps again. A retry threshold is set in order to avoid deadlocks, for example, after ten tries, the thread will be terminated.  
 
-\subsubsection{The Differences Between Interrupt and Exception}
+\subsection{The Differences Between Interrupt and Exception}
 
 Sleeping inside the page fault handler sounds strange. To explain it, I should briefly talk about what are exception and interruption and what's the difference.
 
@@ -99,6 +99,9 @@ We hook a Windows internal function in order to know when it's the end of the sy
 
 \subsection{TLB Caching}
 
+Translation lookaside buffer(TLB) is a memory cache that is used to accelerate the process of paging. Each CPU core has it's own set of TLB. It has a fixed number of slots containing page table entries. Because accessing cache is much faster than accessing memory. When cache contains the page table entries needed, the CPU don't have to walk through the page table.
+
+Since the page protection is based on page attribute transition, every time we make changes to page table entries, we also need to update TLB on all the CPU cores in order to reflect the changes. 
 
 \subsection{Hypervisor}
 
