@@ -135,11 +135,7 @@ Kernel TOCTOU only needs accurate timing and memory writing, it's too plain to t
 
 It's a security feature since Broadwell microarchitecture. It prevents operating system kernel directly accessing user-mode memory, which raises an exception. The intension is to stop transferring malicious payload from user space to kernel space.
 
-%This makes it harder for attackers to "trick" the kernel into using instructions or data from a user-mode program. 
-
-Also because kennel does need to legally get data from user space, two more new instructions are provided to accomplish that. "STAC"/"CLAC" are to disable/enable SMAP temporarily. The idea is that the kernel should be aware of when it's doing so. 
-
-%Kernel code reads and writes user-mode data are commonplace. It's inevitable because user programs need to provide parameters to system calls. Therefore, two new instructions "STAC" and "CLAC" are provided to disable SMAP temporarily, giving opportunity for kernel to retrieve user data in a controllable way.
+SMAP is enabled when the SMAP bit(21) in the CR4 is set. SMAP can be temporarily disabled for explicit memory accesses by setting the EFLAGS.AC (Alignment Check) flag. Because kennel does need to legally get data from user space, two more new instructions "STAC" (set AC flag) and "CLAC" (clear AC flag) are provided to accomplish that. The idea is that the kernel should be aware of when it's doing so. 
 
 For example, Linux kernel support for SMAP since version 3.7. All the accesses to user mode memory must go through two gateway functions copy\_to\_user() and copy\_from\_user(), where SMAP is temporarily disabled.
 
