@@ -5,20 +5,33 @@
 \subsection{Implementation}
 \label{sec:implementation}
 
-In this section, we provide the implementation details of major components of the projects and the important issues that we faced during implementation.
+In this section, we give some implementation details and issues that we had during development.
 
 \subsubsection{Hypervisor}
 
-To leverage Intel processor's SMAP feature, our implementation is based on Intel VMX( Virtual Machine eXtensions).
+%To leverage Intel processor's SMAP feature, our implementation is based on Intel VMX( Virtual Machine eXtensions).
 
-VMX provides two modes, non-root and root mode, where non-root mode runs guest operating systems, root mode run the hypervisor also called VMM(Virtual Machine Monitor). Traditionally, there are four privilege rings on x86 architecture, ring 0 has the most privileges, ring 3 has the least privileges. Root mode which is even more privileged than ring 0 is often called ring -1.
+There are two new modes to run under virtualization: VMX root operation and VMX non-root operation. VMX stands for virtual machine extension. It proves new instructions VMXON, VMXOFF, VMPTRLD, VMPTRST, VMCLEAR, VMREAD, VMWRITE, VMCALL, VMLAUNCH, VMRESUME.
+
+Usually processor has running mode known as ring-0 to ring-3, where ring-0 is kernel mode, ring-3 is user mode, ring 1 and ring 2 are rarely used. When CPU enables virtualization, it could be seen as running in the non-root mode. The root mode can be considered as a lower and more privileged level, it controls the whole CPU. And the guest operating system will run in non-root mode. Root mode runs VMM (Virtual Machine Monitor) is often called ring -1.
+
+VMXON and VMXOFF are instructions to enter and exit VMX mode. There is an important data structure called VMCS (Virtual-Machine Control Structure), which is 4 KB large in size. It controls the state switch between VMX root mode and VMX non-root mode. From root mode to non-root mode called VM Exit. From non-root mode to root mode called VM Enter.
+
+Every logical CPU (each core in a real physical CPU is called a logical CPU) has a processor state called VMCS pointer. It contains the physical address of the VMCS. There could be many VMCSs, the one stored in VMCS pointer is considered as the current one. Every VMCS can represent a virtual processor for the virtual machine, inside virtual machine, that is a logical CPU seen by operating system. Although hypervisor knows the physical address of a VMCS, but hypervisor cannot modify it directly, hypervisor can only reads and writes VMCS using VMREAD, VMWRITE instructions. Hypervisor use VMPTRLD to set a VMCS both as active and current. And use VMCLEAR to mark the VMCS as inactive.
+
+A VMCS contains many fields related every aspect of a virtual machine. There are six fields: Guest-state area, Host-state area, VM-execution control fields, VM-exit control fields, VM-entry control fields and VM-exit information fields. And each field also contains many more control fields with a lot of settings. Once the CPU enters into a virtual machine by execute VMLAUNCH which associates with a VMCS, this virtual machine is fully control by the settings in the VMCS. Hypervisor can set during what circumstances the virtual machine should exit. And then the hypervisor can handle this situation, for example emulate a hardware device or change the virtual machine's behavior.
+
+In our case, we do not actually emulate any hardware device, we put the current system into a virtual machine environment and our code run as the hypervisor.
 
 
-VMXON\textbackslash{}VMXOFF are the instructions to enter\textbackslash{}exit VMX mode. The VMCS(Virtual Machine Control data Structure) is defined for VMX operation. It manages transitions in and out of VMX non-root operation (enter\textbackslash{}exit virtual machine) as well as processor behavior in VMX non-root operation. A VMCS is loaded with the VMPTRLD instruction and is read/written with the VMREAD/VMWRITE instructions. A VMM could use a different VMCS for each virtual machine that it supports. Our hypervisor only has one guest which is the current operating system, we use the same VMCS for each logical processor in the system. 
+%VMX provides two modes, non-root and root mode, where non-root mode runs guest operating systems, root mode run the hypervisor also called VMM(Virtual Machine Monitor). Traditionally, there are four privilege rings on x86 architecture, ring 0 has the most privileges, ring 3 has the least privileges. Root mode which is even more privileged than ring 0 is often called ring -1.
 
-A VMCS contains many fields related every aspect of a virtual machine. There are Guest-state area, Host-state area, VM-execution control fields, VM-exit control fields, VM-entry control fields and VM-exit information fields. Each field also contains many control fields, for example, the field which update CR4 when enters VM.
 
-Our hypervisor is loaded as a Windows kernel driver. Since it doesn't need to emulate any devices, it simply sets VMCS properly and calls VMLAUNCH to enter the virtual machine. The operating system then runs in the non-root mode. When events cause VM exit, our hypervisor handles them in the root mode and send the VM back to virtual machine using VMRESUME. 
+%VMXON/VMXOFF are the instructions to enter/exit VMX mode. The VMCS(Virtual Machine Control data Structure) is defined for VMX operation. It manages transitions in and out of VMX non-root operation (enter/exit virtual machine) as well as processor behavior in VMX non-root operation. A VMCS is loaded with the VMPTRLD instruction and is read/written with the VMREAD/VMWRITE instructions. A VMM could use a different VMCS for each virtual machine that it supports. Our hypervisor only has one guest which is the current operating system, we use the same VMCS for each logical processor in the system. 
+
+%A VMCS contains many fields related every aspect of a virtual machine. There are Guest-state area, Host-state area, VM-execution control fields, VM-exit control fields, VM-entry control fields and VM-exit information fields. Each field also contains many control fields, for example, the field which update CR4 when enters VM.
+
+%Our hypervisor is loaded as a Windows kernel driver. Since it doesn't need to emulate any devices, it simply sets VMCS properly and calls VMLAUNCH to enter the virtual machine. The operating system then runs in the non-root mode. When events cause VM exit, our hypervisor handles them in the root mode and send the VM back to virtual machine using VMRESUME. 
 
 \subsubsection{Page faults}
 Intercepting exceptions is the core function of our project. The one we focused on is page fault exception.
