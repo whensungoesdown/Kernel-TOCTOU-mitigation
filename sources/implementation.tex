@@ -1,15 +1,14 @@
 %! TEX root = 'main.tex'
 
-\section{Experiments}
+%\section{Experiments}
 
-\subsection{Implementation}
+\section{Implementation}
 \label{sec:implementation}
 
 In this section, we give some implementation details and issues that we had during development.
 
-\subsubsection{Hypervisor}
+\subsection{Hypervisor}
 
-%To leverage Intel processor's SMAP feature, our implementation is based on Intel VMX( Virtual Machine eXtensions).
 
 There are two new modes to run under virtualization: VMX root operation and VMX non-root operation. VMX stands for virtual machine extension. It proves new instructions VMXON, VMXOFF, VMPTRLD, VMPTRST, VMCLEAR, VMREAD, VMWRITE, VMCALL, VMLAUNCH, VMRESUME.
 
@@ -19,24 +18,14 @@ VMXON and VMXOFF are instructions to enter and exit VMX mode. There is an import
 
 Every logical CPU (each core in a real physical CPU is called a logical CPU) has a processor state called VMCS pointer. It contains the physical address of the VMCS. There could be many VMCSs, the one stored in VMCS pointer is considered as the current one. Every VMCS can represent a virtual processor for the virtual machine, inside virtual machine, that is a logical CPU seen by operating system. Although hypervisor knows the physical address of a VMCS, but hypervisor cannot modify it directly, hypervisor can only reads and writes VMCS using VMREAD, VMWRITE instructions. Hypervisor use VMPTRLD to set a VMCS both as active and current. And use VMCLEAR to mark the VMCS as inactive.
 
-A VMCS contains many fields related every aspect of a virtual machine. There are six fields: Guest-state area, Host-state area, VM-execution control fields, VM-exit control fields, VM-entry control fields and VM-exit information fields. And each field also contains many more control fields with a lot of settings. Once the CPU enters into a virtual machine by execute VMLAUNCH which associates with a VMCS, this virtual machine is fully control by the settings in the VMCS. Hypervisor can set during what circumstances the virtual machine should exit. And then the hypervisor can handle this situation, for example emulate a hardware device or change the virtual machine's behavior.
+A VMCS contains many fields related every aspect of a virtual machine. There are six fields: Guest-state area, Host-state area, VM-execution control fields, VM-exit control fields, VM-entry control fields and VM-exit information fields. And each field also contains many more control fields with a lot of settings. Once the CPU enters into a virtual machine by execute VMLAUNCH which associates with a VMCS, this virtual machine is fully control by the settings in the VMCS. For example, the CR4 field in the Guest-state area is the one we used to update the actual CPU register.  Hypervisor can set during what circumstances the virtual machine should exit. And then the hypervisor can handle this situation, for example emulate a hardware device or change the virtual machine's behavior. In this case, it's the control register related operations that we are interested. 
 
-In our case, we do not actually emulate any hardware device, we put the current system into a virtual machine environment and our code run as the hypervisor.
+We do not actually emulate any hardware device, we put the current system into a virtual machine environment and our code run as the hypervisor.
 
+\subsection{Page Faults}
+Handling exceptions is the major part of this mitigation. The type we need to handle is page fault exception. They may be caused directly by SMAP or by our protection on the pages. Even though it's called "page fault", but not all exceptions are due to program errors. For example, page fault is one part of paging mechanism in x86 architecture to make the virtual memory much larger then the physical memory that exists in the system. 
 
-%VMX provides two modes, non-root and root mode, where non-root mode runs guest operating systems, root mode run the hypervisor also called VMM(Virtual Machine Monitor). Traditionally, there are four privilege rings on x86 architecture, ring 0 has the most privileges, ring 3 has the least privileges. Root mode which is even more privileged than ring 0 is often called ring -1.
-
-
-%VMXON/VMXOFF are the instructions to enter/exit VMX mode. The VMCS(Virtual Machine Control data Structure) is defined for VMX operation. It manages transitions in and out of VMX non-root operation (enter/exit virtual machine) as well as processor behavior in VMX non-root operation. A VMCS is loaded with the VMPTRLD instruction and is read/written with the VMREAD/VMWRITE instructions. A VMM could use a different VMCS for each virtual machine that it supports. Our hypervisor only has one guest which is the current operating system, we use the same VMCS for each logical processor in the system. 
-
-%A VMCS contains many fields related every aspect of a virtual machine. There are Guest-state area, Host-state area, VM-execution control fields, VM-exit control fields, VM-entry control fields and VM-exit information fields. Each field also contains many control fields, for example, the field which update CR4 when enters VM.
-
-%Our hypervisor is loaded as a Windows kernel driver. Since it doesn't need to emulate any devices, it simply sets VMCS properly and calls VMLAUNCH to enter the virtual machine. The operating system then runs in the non-root mode. When events cause VM exit, our hypervisor handles them in the root mode and send the VM back to virtual machine using VMRESUME. 
-
-\subsubsection{Page faults}
-Intercepting exceptions is the core function of our project. The one we focused on is page fault exception.
-
-Even though it's called "page fault", not all exceptions are due to program errors such as writing read-only page. For example, page fault is part of paging mechanism to extend the virtual memory that make it even larger then the actual available physical memory . Therefore operating system needs to handle page faults accordingly. When it happens, a 32-bit error code is pushed into the kernel stack by hardware. It's fields is shown in~\autoref{fig:pagefaulterrorcode}.
+We need to handle all the page fault exceptions before the system's handler does. Some of the them need to be passed to the operating system, for example, those invalid pages. And the others need to be intercepted. There is a 32-bit error code being pushed into the kernel stack when exception triggered, as shown in~\autoref{fig:pagefaulterrorcode}.
 
 
 \begin{figure}[th]
@@ -46,12 +35,11 @@ Even though it's called "page fault", not all exceptions are due to program erro
   \label{fig:pagefaulterrorcode}
 \end{figure}
 
-However, the error code doesn't clearly indicate the exact reason that caused the exception. For example, there is no "SMAP bit", out page fault handler need to distinguish exceptions with other information. With error code, register values of EIP, CS, ESP, SS, EFLAGS are also pushed into kernel stack when exception happens. We also get the current page directory from CR3 and the virtual address that caused the exception from CR2.
+The bits don't clearly indicate the cause. For example, there is no "SMAP" bit. So our page fault handler needs to collect more information in order to tell the possible reason for the exception. Register values of EIP, CS, ESP, SS, EFLAGS are also pushed into the kernel stack with the error code. We also get the page table root from CR3 and the faulting virtual address from CR2.
 
-First, We need to screen out some of the cases that don't related to us. For example, When exception comes in with "P" bit equals zero, it indicates that the page is not present in memory. It's part of the paging mechanism, pages can be swapped out to secondary storage such as hard disk. Even our page fault handler itself may trigger this type of page faults. Since page tables are reside in the page-able pages, when we get PTE for the faulting page, the PTE may not present in the memory.. Therefore we need to bypass such page faults to operating system as early as possible, otherwise it will cause a dead loop inside our handler. We also observe that there is no exception caused both by non-present page and SMAP at the same time.
+First, We need to screen out some of the cases that are irrelevant. For example, When exceptions come in with "P" bit unset, indicating that the page is not present in the memory. It's part of the paging mechanism, pages can be swapped out to secondary storage such as hard disk. Even our page fault handler itself may trigger this type of page faults. Since page tables are reside in the page-able pages, so when we walk through the page table, some of the PTE pages may not be there. Therefore we need to pass such page faults to operating system as soon as possible, otherwise it will cause a dead loop inside our handler. We also observe that there is no exception caused both by non-present page and SMAP at the same time, so it's safe to do so.
 
-
-After screen out unrelated exceptions, the algorithm that handles SMAP and related exceptions is shown in Algorithm~\ref{algo:pagefaulthandler}.
+After screen out unrelated exceptions, the algorithm that handles mitigation related exceptions is shown in Algorithm~\ref{algo:pagefaulthandler}.
 
 
 \begin{algorithm}[ht]
@@ -96,9 +84,9 @@ After screen out unrelated exceptions, the algorithm that handles SMAP and relat
 \end{algorithm}
 
 
-Another technique detail we should mention is that when entering page fault handler, interrupts are tuned off automatically. Exception is raised through an "interrupt gate", for which processor clears the IF(Interrupt enable flag) in the register EFLAGS and and it will be set back when interrupts "IRET". In our case, after getting the faulting virtual address from CR2, we set IF flag by executing instruction "STI" in order to let the processor be able to receive nested exceptions.
+Another technical detail we should mention is that when entering page fault handler, interrupts are tuned off automatically. This is because exception is raised through an "interrupt gate". The CPU clears the IF(Interrupt enable flag) in the EFLAGS register and sets it back when interrupts return. In our case, after getting the faulting virtual address from CR2, we immediately set the IF flag by executing instruction "STI" in order to let the processor being able to receive nested exceptions.
 
-\subsubsection{PTE Update}
+\subsection{PTE Update}
 
 After getting the right exception, we need to change bits of the corresponding PTE as we mentioned earlier. In a multi-processor system, updating global data such as page tables need to hold a global lock to synchronize. Since Windows operating system doesn't open such interface to third-party drivers, we can only synchronize our own operations. Because in a attacking scenario, there will be at least two threads, one is calling the vulnerable system service and the other is modifying the data. They repeat themselves in high frequency to win the race. Therefore, the page fault handler will get the corresponding exceptions also in high frequency. 
 
@@ -158,7 +146,7 @@ mov eax, 'addr'
 lock or/and [eax], 'mask'
 \end{lstlisting}
 
-\subsubsection{TLB Flushing}
+\subsection{TLB Flushing}
 A TLB(Translation Lookaside Buffer) is a memory cache that is used to store the mappings between virtual pages and physical pages as well as page attributes, in order to reduce the time taken to walk through the page tables that locate in memory, which is slower compares to cache. 
 
 Different than data cache, TLB is not entirely transparent to the operating system. When operating system updates page tables, related TLB entries need to be invalidated. Since our solution rely upon page permits, we need to invalidate the corresponding TLB entries to make new page permits effective.
@@ -169,7 +157,7 @@ IPI allows a processor to send interrupt signals to other processors. It's diffe
 
 In our implementation, we reuse some of the functionality from Windows operating system to issue such an IPI packet that indicate a TLB flushing to all the related processors, except the current one which is issuing the IPI.
 
-\subsubsection{Crashing Thread}
+\subsection{Crashing Thread}
 
 As mentioned earlier, to solve the problem that a user mode thread tries to write a protected page, instead of crashing the thread immediately, our approach is to hold the thread for some milliseconds waiting for the function to end. To avoid any deadlock or blockage caused by a faulty program, the retries are only allowed for several times. 
 
@@ -179,7 +167,7 @@ Since it's troublesome to call undocumented functions to handle exceptions. We c
 %global hook, it may use shared memory,  before put it here, probably should figure out how page permits works on shared page
 
 
-\subsubsection{Special Cases}
+\subsection{Special Cases}
 We assume 32bit Windows operating system use the default 2G/2G user/kernel split where user space is below 0x7FFFFFFF. More precisely, a kernel variable MmUserProbeAddress contains the highest possible address for user data, which is set to 0x7FFF0000. And we learn that one page locates at 0x7FFE0000 is defined as USER\_SHARED\_DATA. It's a shared page between user mode and kernel mode, meaning the same physical page is mapped both at 0x7FFE0000 and 0xFFDF0000. It's a read-only page and contains a lot of process settings such as system time. Kernel needs to read this page a lot. We treat such page specially to further improve performance. 
 
 
