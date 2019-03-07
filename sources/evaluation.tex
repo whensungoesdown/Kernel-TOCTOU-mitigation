@@ -38,17 +38,17 @@ The result shows that the performance overhead is modest. Because only the syste
 %g_PagefaultCount 9000, g_PagefaultSMAPCount 8968
 
 
-Part of the overhead is introduced because of the overall intercepting of page fault exceptions of the system. The page fault handler is called in high frequency. Our page fault hook currently is installed directly in the IDT table of each processor. Hence every page fault exception goes through our handler. Even though we let go in the every beginning if the current CR3 doesn't match the targeted ones, still there will be several extra instructions for each exception. Later we will use hypervisor to provide special IDT just for the targeted processes, only during which the page fault handler is intercepted.
+Part of the overhead is introduced due to the overall intercepting of page fault exceptions of the system. The page fault handler is called in high frequency. Our page fault hook currently is installed directly in the IDT table of each processor. Hence every page fault exception goes through our handler. Even though, in the very begining, we pass through exceptions that doesn't belong to the target process, still extra instructions are executed for each exception.
 
 %Although we use virtualization techniques, but the hypervisor we use is a very simple one. Unlike commercial virtualization solutions such as VMWare, Xen and Qemu+Kvm, ours doesn't emulate any hardware devices nor intercept further page mapping translate that between host and guest. Only several types of VM-Exit is inevitable such as control register accessing which we do need to handle it too.
 
-\subsection{Real-world Vulnerabilities}
+\subsection{Case Study}
 
-We write a poc(proof of concept) attacking program to test our mitigation against CVE-2008-2252. it triggers the vulnerability, introduce a memory buffer overflow. 
+We write a proof-of-concept(POC) program to test our mitigation against CVE-2008-2252. It triggers the TOCTOU vulnerability to introduce a memory buffer overflow. 
 
 %We test it on the Windows XP sp3 system with the vulnerable win32k.sys file whose version is 5.1.2600.5512. Because SMAP only available at Intel 5th generation CPU (architecture code name Broadwell). Hard-disk controller which integrated in the CPU corresponded chipset doesn't support ATA mode anymore, and Windows XP system doesn't support AHCI mode, so it's difficult to install it on a modern PC. Our testing environment is established using a virtual machine. Particularly, VMWare Workstation 14 Player, emulated "Intel Core i5-6200U CPU (2 cores) with 1GB of RAM", option "Virtualize Intel VT-x/EPT or AMD-v/RVI" also enabled.
 
-The attacking program has two threads. The main thread first allocate a page at virtual address 0, which later used as the parameter to be sent into the vulnerable system call. The reason to choose page zero is for bypassing the parameter validity checking in system call NtUserMessageCall. Next, right after creating another thread, it keeps calling the vulnerable function SendMessage (WM\_COPYDATA) with the malicious parameters in a loop, which eventually calls the vulnerable win32k function xxxInterSendMsgEx. The created thread then keep modifying the parameter at page zero, also in a loop, simultaneously.
+The attacking program has two threads. The main thread first allocate a page at virtual address 0, which later used as the parameter to be sent into the vulnerable syscall. The reason to choose page zero is to bypass the parameter check in syscall NtUserMessageCall. Next, right after creating another thread, it keeps calling the vulnerable function SendMessage (WM\_COPYDATA) with the malicious parameters in a loop, which eventually calls the vulnerable win32k function xxxInterSendMsgEx. The created thread then keep modifying the parameter at page zero, also in a loop, simultaneously.
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/ms08061case}
@@ -64,7 +64,7 @@ CVE-2013-1254 is another typical TOCTOU vulnerability that found in Windows win3
 
 %A series of same kind of vulnerability found in 26 functions of module win32k.
 
-\begin{lstlisting}[basicstyle=\small,style=redkeyword] 
+\begin{lstlisting}[style=code] 
 .text:BF8A993F   mov   eax, _W32UserProbeAddr
                        .
                        .
@@ -78,8 +78,8 @@ CVE-2013-1254 is another typical TOCTOU vulnerability that found in Windows win3
 \end{lstlisting}
 %\captionof{lstlisting}{Flawed code in win32k.sys function SfnINOUTSTYLECHANGE()}
 
-The flawed function first fetch a value from \[ecx+8\] and compare it with \_W32UserProbeAddress which is a value that indicates the highest possible address for user-mode variables. It confirms that the variable is actually reside in user space. Next, it fetches the value again and assign it to eax. This is where the double fetch happens. The attacker can change the value between those two fetches, letting it bypass the verification,  then assign it a kernel space address.
+The flawed function first fetch a value from "ecx+8" and compare it with \_W32UserProbeAddress which is a value that indicates the highest possible address for user-mode variables. It confirms that the variable is actually reside in user space. Next, it fetches the value again and assign it to eax. This is where the double fetch happens. The attacker can change the value between those two fetches, letting it bypass the verification,  then assign it a kernel space address.
 
-So when \[ecx+8\] is referenced the first time, the corresponding page will trigger a SMAP exception, then this page will be protected until the current system call ends. Other threads write to it will also trigger page fault exceptions, as explained in the previous case, out page fault handler will handle those to keep the data consistent. 
+So when "ecx+8" is referenced the first time, the corresponding page will trigger a SMAP exception, then this page will be protected until the current system call ends. Other threads write to it will also trigger page fault exceptions, as explained in the previous case, out page fault handler will handle those to keep the data consistent. 
 
 
