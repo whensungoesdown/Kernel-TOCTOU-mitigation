@@ -17,19 +17,14 @@ We repurposed SMAP for vulnerability mitigation in this paper, now we want to fu
 
 During the implementation, we found several bugs in win32k.sys module. For example, user data fetching without a "try \& catch", which may lead to a local DOS vulnerability if the attacker purposefully invalid the user pages during the syscall. We also found several double fetches with "read write" and "read read" patterns.
 
-\textbf{IPI Mechanism  }Currently we reuse part of the functionality of Windows to flush TLB. Those internal functions are not exported and will change prototypes in further versions. For further work, we plan to implement the IPI mechanism.
+\textbf{IPI Mechanism  }Currently we reuse part of the functionality of Windows to flush TLB. Those internal functions are not exported and will change prototypes in further version. For further work, we plan to implement the IPI mechanism.
 
-\subsection{Discussion: Solving Write Conflict}
+\subsection{Discussion: Solving Write Conflicts}
 
-As mentioned in~\autoref{sec:design}, our current implementation for solving write conflict is by delaying the writing thread. At first, we tried to solve it by implementing a more fine-grain COW(Copy On Write) which based on thread instead of process. Normal COW works in the following way.
+As mentioned in~\autoref{sec:design}, to solve the write conflicts, we choose to let the thread waiting inside the page fault handler. There could be other ways to solve this. At first we were considering the solution of a thread level copy-on-write(COW). First, we need a hypervisor that can dynamically switch page tables when the CPU runs on different threads. Even though there is no direct VM exit event that indicates thread switching, but since the OS needs to read/write some data structure when doing this, by monitoring pages that contains those data structures, thread switching can be monitored~\cite{pan2017digtool}.
 
-Two or more processes share read-only pages, when data is written to these pages, the kernel intercepts the write attempt and allocates a new physical page, initialized with the original data. This is based
+When a thread writes a protected page, the current page table will be cloned, assigns it to the writing thread. And then duplicates the protected page with a new physical page, sets it as writable in PTE of the new page table. Therefore the thread can write to the page without affecting the user data that previously being referenced by the syscall.
 
-
-The other idea is that by implementing COW(Copy On Write) more fine-grain that based on threads, we can provide protection and writing consent at the same time. Traditional COW that based on processes is kept as is, such as module sharing won't be affected. Considering performance overhead, only page protection collision as discussed above happens, new page tables will be established and they splits from original ones. There will have one new page table entry which provides a new physical page mapping for the writing thread. Then the writing thread can write to the page without affecting the user buffer parameter which previously submitted to a system call. When the previous system call ends, it can trace the pages that being protected and other page tables that generated due to the collisions, merges two physical pages (update the original physical page with new modification) and eliminates the new generated page tables for the writing thread.
-
-We think that comparing to the writing thread, the system call initiating thread is the first one who accessed the collision page. When the syscall ends, new data from the writing thread should be updated to the original page. If the updated part coincide with the buffer of the previous syscall parameter, then the data inconsistency should be correctly handled by operating system by default, because the change of data happens after a complete syscall.
-
-Well known facts about paging on x86 architecture, for each thread, the root of page tables is stored in CR3, by which CPU can translate virtual-physical page mappings automatically in hardware. CR3 are updated by OS thread scheduling code during thread switching. Since we don't want to modify the target operating system, we can use hypervisor to monitoring thread switching events just like what we did for process context switching. There is no direct VM exit event that represent thread switching, but indirectly OS will access certain data structure when scheduling. By monitoring pages that contains certain system data structures, thread switching can be monitored~\cite{pan2017digtool}.
+When the syscall ends, it's time to merge the two pages and two set of page tables back. But it's hard to decide which page's content should remain. By bring up this discussion, We hope to find a more reliable solution. 
 
 
