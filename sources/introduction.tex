@@ -11,12 +11,12 @@ There are cases, where user-mode variables as system call parameters being refer
 
 To mitigate such attacks, we leverage a hardware feature, Intel Supervisor Mode Access Prevention (SMAP) to monitor memory accesses. SMAP is a CPU feature that prevents operating system kernel from accessing user-mode memory directly. Any user memory reference will raise an exception that will be handled by our page fault handler hook. When a system call reads/writes a user variable, the page referenced will be protected by changing it to a kernel page. Therefore, no modification from user-mode will be allowed during the system call execution. Those pages could also be set back to user page with read-only attribute, hence they are readable by other user threads. After the current system call ends, protected pages will be restored to their original state.
 
-We also propose an approach to solve conflicts when other user threads try to write to the protected page. This is common when multiple threads have some shared data or using the same heap pool. Normally it's a hard case because there is no practical way to protect a partial of a page due to the current x86 architecture. Instead of tracing each instructions as what single step trap does, we make the writing thread wait and check periodically whether the page is off protection. This operation is done within the context of the current exception that caused by SMAP, hence no more monitoring or tracing needed. 
+We also propose an approach to solve conflicts when other user threads try to write to the protected page. This is common when multiple threads have some shared data or using the same heap pool. Normally it's a hard case because there is no practical way to protect a partial of a page due to the current x86 architecture. Instead of tracing each instructions as what single step trap does, we make the writing thread wait and check periodically whether the page is off protection. This operation is done within the context of the current exception that caused by SMAP, hence no more monitoring or tracing needed. This paper makes the following contributions.
 
 %Malicious shared data access pattern is the core cause for kernel TOCTOU. To ensure zero false positives, our solution should identify all legitimate data accesses accurately. For instance, a program thread may attempt writing to shared data, while it (or other data on the same memory page) is protected because of the active system call by another thread. To address that, our solution is to hold the write thread, waiting for the system call to end when the page is no longer protected. Once done, the page permissions are restored and the write thread is scheduled for execution and write access. 
 
-The contributions of this paper are as follows:
-\begin{itemize}
+%The contributions of this paper are as follows:
+\begin{itemize}[leftmargin=*]
     \item We investigated how kernel TOCTOU work with study cases.
     \item Proposing a novel run-time mitigation which leverage hardware feature(SMAP) to achieve modest performance overhead. 
     \item We evaluated it with real-word vulnerabilities and measured performance overhead.
