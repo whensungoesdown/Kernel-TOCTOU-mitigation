@@ -51,26 +51,26 @@ After screen out unrelated exceptions, the algorithm that handles mitigation rel
 \Procedure{PageFaultHandler}{}
 
 \State $address\gets cr2$ 
-\State $pte\gets \Call{\textbf{GET\_PTE}}{address}$
+\State $pte\gets \Call{\textbf{GetPte}}{address}$
 \State $teb\gets fs:0x18$
 
-\If{smap\_violation}
-	\State $pages[ ]\gets \Call{\textbf{ADD\_PAGE}}{$address, pte, cr3, teb$}$
-    	\State \Call{\textbf{SET\_PAGE\_KERNEL}}{pte}
-    	\State \Call{\textbf{FLASH\_TLB}}{address}
+\If{SmapViolation}
+	\State $pages[]\gets \Call{\textbf{AddPage}}{$address, pte, cr3, teb$}$
+    	\State \Call{\textbf{SetPageKernel}}{pte}
+    	\State \Call{\textbf{FlashTlb}}{address}
     	\State \Return{Re-execute}
-\ElsIf{user\_access\_protected\_page}
+\ElsIf{UserAaccessProtectedPage}
 	\If{error.WRITE}
     		\Repeat 
-		\State \Call{\textbf{SLEEP}}{}
-        		\If{\Call{\textbf{CHECK\_PERMITS}}{pte}}
+		\State \Call{\textbf{Sleep}}{}
+        		\If{\Call{\textbf{CheckPtePermits}}{pte}}
         			\State \Return{Re-execute}
         		\EndIf
         	\Until{$count < 10$}
-        	\State \Return{Terminate\_thread}
+        	\State \Return{TerminateThread}
 	\Else
-    		\State \Call{\textbf{SET\_PAGE\_USER\_READONLY}}{pte}
-    		\State \Call{\textbf{FLASH\_TLB}}{address}
+    		\State \Call{\textbf{SetPgeUserReadonly}}{pte}
+    		\State \Call{\textbf{FlashTlb}}{address}
         	\State \Return{Re-execute}
 	\EndIf
 
@@ -79,7 +79,7 @@ After screen out unrelated exceptions, the algorithm that handles mitigation rel
 %%    \EndIf
 
 \EndIf
-\State \Return{original\_handler}
+\State \Return{OriginalHandler}
    
 \EndProcedure
 \end{algorithmic}
