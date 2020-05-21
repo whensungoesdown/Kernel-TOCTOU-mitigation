@@ -22,6 +22,8 @@ A VMCS contains many fields related every aspect of a virtual machine. There are
 
 We do not actually emulate any hardware device, we put the current system into a virtual machine environment and our code run as the hypervisor.
 
+
+
 \subsection{Page Faults}
 Handling exceptions is the major part of this mitigation. The type we need to handle is page fault exception. They may be caused directly by SMAP or by our protection on the pages. Even though it's called "page fault", but not all exceptions are due to program errors. For example, page fault is one part of paging mechanism in x86 architecture to make the virtual memory much larger then the physical memory that exists in the system. 
 
@@ -42,6 +44,7 @@ First, We need to screen out some of the cases that are irrelevant. For example,
 After screen out unrelated exceptions, the algorithm that handles mitigation related exceptions is shown in Algorithm~\ref{algo:pagefaulthandler}.
 
 
+
 \begin{algorithm}[ht]
 \begin{algorithmic}[1]
 \small
@@ -51,30 +54,32 @@ After screen out unrelated exceptions, the algorithm that handles mitigation rel
 \State $pte\gets \Call{\textbf{GET\_PTE}}{address}$
 \State $teb\gets fs:0x18$
 
-\If{$smap\_violation$}
-	\State $pages[]\gets \Call{\textbf{ADD\_PAGE}}{$address, pte, cr3, teb$}$
-    \State $\Call{\textbf{SET\_PAGE\_KERNEL}}{pte}$
-    \State $\Call{\textbf{Flush\_TLB}}{address}$
-    \State \Return{$re-execute$}
-\ElsIf{$user\_access\_protected\_page$}
-	\If{$error.WRITE$}
-    	\Repeat 
-        \State{$\Call{\textbf{SLEEP}}$}
-        \If{$\Call{\textbf{Check\_Permits}}{pte}$}
-        	\State \Return{$re-execute$}
-        \EndIf
-        \Until{$count < 10$}
-        \State \Return{$terminate\_thread$}
-    \Else
-    	\State $\Call{\textbf{SET\_PAGE\_USER\_READONLY}}{pte}$
-    	\State $\Call{\textbf{Flush\_TLB}}{address}$
-        \State \Return{$re-execute$}
-    \EndIf
-%\ElsIf{$user\_write\_readonlypage$}
-%	\If{\Call{HAS\_RECORD}{pte}}
-%    \EndIf
+\If{smap\_violation}
+	\State $pages[ ]\gets \Call{\textbf{ADD\_PAGE}}{$address, pte, cr3, teb$}$
+    	\State \Call{\textbf{SET\_PAGE\_KERNEL}}{pte}
+    	\State \Call{\textbf{FLASH\_TLB}}{address}
+    	\State \Return{Re-execute}
+\ElsIf{user\_access\_protected\_page}
+	\If{error.WRITE}
+    		\Repeat 
+		\State \Call{\textbf{SLEEP}}{}
+        		\If{\Call{\textbf{CHECK\_PERMITS}}{pte}}
+        			\State \Return{Re-execute}
+        		\EndIf
+        	\Until{$count < 10$}
+        	\State \Return{Terminate\_thread}
+	\Else
+    		\State \Call{\textbf{SET\_PAGE\_USER\_READONLY}}{pte}
+    		\State \Call{\textbf{FLASH\_TLB}}{address}
+        	\State \Return{Re-execute}
+	\EndIf
+
+%%\ElsIf{$user\_write\_readonlypage$}
+%%	\If{\Call{HAS\_RECORD}{pte}}
+%%    \EndIf
+
 \EndIf
-\State \Return{$original\_handler$}
+\State \Return{original\_handler}
    
 \EndProcedure
 \end{algorithmic}
@@ -82,6 +87,7 @@ After screen out unrelated exceptions, the algorithm that handles mitigation rel
 \caption{Page Fault Handler}
 \label{algo:pagefaulthandler}
 \end{algorithm}
+
 
 
 Another technical detail we should mention is that when entering page fault handler, interrupts are tuned off automatically. This is because exception is raised through an "interrupt gate". The CPU clears the IF(Interrupt enable flag) in the EFLAGS register and sets it back when interrupts return. In our case, after getting the faulting virtual address from CR2, we immediately set the IF flag by executing instruction "STI" in order to let the processor being able to receive nested exceptions.
@@ -170,3 +176,5 @@ Since it's troublesome to call a series of undocumented functions to handle exce
 
 \subsection{Special Cases}
 We assume 32bit Windows operating system use the default 2G/2G user/kernel split where user space is below 0x7FFFFFFF. More precisely, a kernel variable MmUserProbeAddress contains the highest possible address for user data, which is set to 0x7FFF0000. And we learn that one page locates at 0x7FFE0000 is defined as USER\_SHARED\_DATA. It's a shared page between user mode and kernel mode, meaning the same physical page is mapped both at 0x7FFE0000 and 0xFFDF0000. It's a read-only page and contains a lot of process settings such as system time. Kernel needs to read this page a lot. We treat such page specially to improve performance. 
+
+
