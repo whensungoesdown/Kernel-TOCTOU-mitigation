@@ -10,10 +10,17 @@ CVE-2008-2252 is a typical TOCTOU vulnerability which is analyzed as a example i
 
 \subsection{Performance}
 
+\begin{figure}[th]
+  \includegraphics[width=0.47\textwidth]{figures/benchmark3}
+  \centering
+  \caption{Performance overhead on the SPEC benchmarks incurred by the run-time load hypervisor. HVCI represent the Windows 10 native hypervisor for Hypervisor-Protected Code Integrity. All overheads are normalized to the unprotected system running benchmark.}
+  \label{fig:benchmark}
+\end{figure}
+
 We chose several non-trivial applications to demonstrate the performance overhead that introduced by our mitigation. 
 
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/performance}
+  \includegraphics[width=0.47\textwidth]{figures/performance3}
   \centering
   \caption{Performance overhead in non-trivial applications. Overhead mostly being introduced on system calls that need to fetch user-mode parameters}
   \label{fig:performance}
