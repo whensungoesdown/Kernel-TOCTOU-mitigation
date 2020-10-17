@@ -1,34 +1,46 @@
 %! TEX root = '../main.tex'
 
 \section{Introduction}
+\label{sec:introduction}
 
-Time-of-check-to-time-of-use (TOCTOU) also known as "race condition" or "double fetch" is a long standing problem in software security. It has more than three decades of history. As implied by its name, it occurs because of data changes between the security check points and the data use. TOCTOU is a problem of data inconsistency and it exits in many systems nowadays while having different forms. In this paper, we focus on the one that happens in operating system kernel, so-called kernel TOCTOU, and usually leads to privilege escalation.
+Time-of-check-to-time-of-use (TOCTOU) is also known as "race condition" or "double fetch". It is a long-standing problem in the software security domain. As its name implied, it involves at least two references (on variables). The first reference is usually a security check.  If they passed, for example, the variable's value is not too large,  then assuming it is safe to use it, copying buffer. The variables are in a less privileged security domain. During the time gap,  an attacker could change the variable's value to a much larger one. That may introduce a buffer overflow. TOCTOU is a problem of data inconsistency and it exits in many systems nowadays and it also has many forms. In this paper, we focus on the one that happens in the operating system kernel. This type of attack not only disturbs the system status but also can lead to a serious breach.
 
-Modern operating systems such as Windows and Linux usually have two modes of operation, kernel mode and user mode. Operating system's kernel runs in kernel mode, and has complete access to all of the computer's hardware resources. Kernel provides most of the system's functionality including file system, network, scheduling, and displaying through system calls. The rest of the programs runs in user mode and is isolated from the kernel. They make system calls with parameters to get services via a client-server model. Those parameters could be constant number, pointers, and data structures which may also contain sub-level pointers.
+Modern operating systems such as Windows and Linux have two modes. OS kernel runs in the most privileged mode (kernel-mode). It can access all the computer's hardware resources. It connects them to the application software through system calls. The applications run in user mode which is the least privileged mode (user-mode). It separates from the kernel. To access privileged resources, the application makes system calls with parameters. In a well-designed OS, this is a formal method for kernel and application exchanging data.
 
-There are cases, where user-mode variables as system call parameters being referenced directly by operating system. It is not protected by any system mechanism and those variables also can be modified by other threads at anytime. A good practice to handle parameters for kernel is to "capture" user variables first. Kernel should make its own copy of what it is about to use, and keep the copy instead of the original one through the entire system call execution. Otherwise, malicious applications are able to send in legit parameter to pass kernel's sanity check and later replace it with a malicious one. And this still is what's going on in the modern operating system currently. It may caused by sub-level pointers that embedded in some data structure whose upper level pointer as one of the syscalls parameter is copied to the kernel stack automatically, or due to historical reasons, the operating system may even store and fetch data directly from user-mode space. One thing in common, the kernel trusts the user-mode part of data as unchangeable during the period of its operation, which is not true when in the circumstances of attacking. Moreover
-, due to the nature of this attack which may only involves precise timing and memory overwriting, it's difficult to perform even a run-time checking, not to mention protection. Existing solutions being either too much of overhead or incomplete space coverage.
 
-To mitigate such attacks, we leverage a hardware feature, Intel Supervisor Mode Access Prevention (SMAP) to monitor memory accesses. SMAP is a CPU feature that prevents operating system kernel from accessing user-mode memory directly. Any user memory reference will raise an exception that will be handled by our page fault handler hook. When a system call reads/writes a user variable, the page referenced will be protected by changing it to a kernel page. Therefore, no modification from user-mode will be allowed during the system call execution. Those pages could also be set back to user page with read-only attribute, hence they are readable by other user threads. After the current system call ends, protected pages will be restored to their original state.
+The kernel should make a copy of what is going to use from user space and keep it for the whole lifespan of the system call.  Commercial operating systems each have their own way. For example, the Windows kernel will first "capture" user variables. Linux has copy\_to\_user() and copy\_from\_user() API for kernel and drivers. But due to historical reasons, OS may not always follow that rule or make mistakes.
 
-We also propose an approach to solve conflicts when other user threads try to write to the protected page. This is common when multiple threads have some shared data or using the same heap pool. Normally it's a hard case because there is no practical way to protect a partial of a page due to the current x86 architecture. Instead of tracing each instructions as what single step trap does, we make the writing thread wait and check periodically whether the page is off protection. This operation is done within the context of the current exception that caused by SMAP, hence no more monitoring or tracing needed. This paper makes the following contributions.
+There are cases where the kernel read or store user-mode variables. This is possible as long as the user page is valid while accessing. But it is also vulnerable. Because a malicious user can use another thread to access those variables at the same time. 
 
-%Malicious shared data access pattern is the core cause for kernel TOCTOU. To ensure zero false positives, our solution should identify all legitimate data accesses accurately. For instance, a program thread may attempt writing to shared data, while it (or other data on the same memory page) is protected because of the active system call by another thread. To address that, our solution is to hold the write thread, waiting for the system call to end when the page is no longer protected. Once done, the page permissions are restored and the write thread is scheduled for execution and write access. 
+Plain memory access is common, even it is from kernel to user space. In essence, it is a bad programming practice rather than a fault. Hence, existing solutions are either high-overhead or low-coverage.
 
-%The contributions of this paper are as follows:
-\begin{itemize}[leftmargin=*]
-    \item We investigated how kernel TOCTOU work with study cases.
-    \item Proposing a novel run-time mitigation which leverage hardware feature(SMAP) to achieve modest performance overhead. 
-    \item We evaluated it with real-word vulnerabilities and measured performance overhead.
-    \item We made a tool that also leverage SMAP to find more kernel TOCTOU vulnerabilities.
-\end{itemize}
+To mitigate as a run-time solution, must find such kernel behaviors in a low-cost manner. We learned that Intel's CPU series has an interesting feature. That is Supervisor Mode Access Prevention (SMAP). When enabled, it prevents the kernel from accessing user space. Such violations will raise exceptions. We call it the SMAP exception for the rest of the paper.
+
+We take control of the page fault handler.  The system should halt when it sees a SMAP exception.  Instead, we handle it and keep the system going. To protect the page, we find its corresponding page table entry (PTE) and clear the USER/SUPERVISOR bit. After this, the user page becomes a kernel page. User threads are no longer able to access it. Also, this is the only way to continue from a SMAP exception.  This page will remain in the kernel until the current system call ends.
+
+There are still legit user-mode accesses on this user page. If it is a read, set the page READONLY and move it back to the user space. 
+For the write access, we stale the user thread until the current system call ends.
 
 %We also implement a hypervisor which can confine a system wide feature such as SMAP to a specific process. We observe that not all the processes need to be monitored such as process that already run with administrator or system privilege. Because kernel TOCTOU vulnerabilities are mostly used to escalate privilege, only services that has interface exposed and alien process are the main suspects of such attack. With our hypervisor, process can be specified according to the system policy, it can greatly reduce system overhead.
 
-Since SMAP is a CPU feature, setting it will cause effect on all the processes in the system. Our platform is Windows OS which didn't regulate it's kernel to compliance. So debugging a system feature concurrently on all the processes is inconvenient. To make it even possible, we implemented a light-weight hypervisor which can confine the system wide feature SMAP to one or more specific processes. We also argue that not all processes in the system need to be protected equally. For example, the ones that already run with administrator or system privilege are needless to monitor, because kernel TOCTOU vulnerabilities are mostly used to escalate privilege, and only those who has interface exposed to users or alien processes are the main candidates. With the hyervisor, we can choose processes according to the security policy meanwhile greatly lower the performance overhead for the whole system. 
+SMAP is a system-wide CPU feature. It is active when the SMAP bit in the CR4 control register is set.  Once enabled, it affects every process in the system. The mitigation is to protect the kernel against the malicious user process. In most cases, the attacker uses kernel TOCTOU vulnerability to further escalate privilege. Hence, many trusted processes don't need protection. Processes that are already running at a high privilege also don't need it. 
 
-We made this system-feature-isolating hypervisor framework easily adoptable, which is also can be considered as a contribution of this paper.
+To contain SMAP within each process, we develop a light-weight hypervisor. It monitors the process scheduling. Each process has its own set of control registers, established by the hypervisor. When scheduling a new process, it brings the new control register values to the hardware. Hence, the SMAP bit is set only when the current process matches the policy. This way the mitigation is more configurable and it introduces less overhead.
 
-%The hypervisor can further do more fine-grain isolation to thread level. It not only make a hardware feature more flexible, but also enrich hardware level resources. For example, Intel x86 processors support up to four hardware breakpoints/watchpoints using the special purpose DR0 to DR7 registers, but with our hypervisor framework, it can provide four breakpoints/watchpoints for each thread.  (should we mention that?)
+The light-weight hypervisor itself is easy to configure for other applications. It is also a contribution of this paper.
 
-This paper is organized as follows. 
+
+
+The contributions of this paper:
+\begin{itemize}[leftmargin=*]
+    \item We investigate on kernel TOCTOU vulnerability using study cases.
+    \item A novel run-time mitigation leveraging hardware feature (SMAP). 
+    \item Evaluation with real-word vulnerabilities.
+    \item A configurable light-weight hypervisor to isolate system-wide CPU features.
+    \item A fuzzing tool for kernel TOCTOU vulnerabilities.
+\end{itemize}
+
+
+
+This paper is organized as the following. 
+This work is structured as follows. In ~\autoref{sec:background}, we describe the mechanism behind kernel TOCTOU vulnerabilities. Give background information about this hardware feature SMAP. In ~\autoref{sec:design}, we describe our framework for run-time mitigation. How the light-weight hypervisor contains the SMAP feature on a particular process. In ~\autoref{sec:implementation}, we document some implementation details. In ~\autoref{sec:evaluation}, we test our mitigation with real-world vulnerabilities.  In ~\autoref{sec:limitation},  we discuss an alternative to solve the writing conflicts and our further work. In ~\autoref{sec:relatedwork}, we discuss related works and conclude with ~\autoref{sec:conclusion}.
