@@ -2,13 +2,21 @@
 \section{Evaluation}
 \label{sec:evaluation}
 
-In this section, we evaluates our project's performance overhead and how it's protecting operating system from real-world vulnerabilities.
-
-All experiments are preformed on the desktop which has Intel Core I5-6400 (6 GEN CPU Skylake), ASUS H110M-C mother board(Intel H110 Chipset, Realtek RTL8111H Network Controller), 8GB ram and 500GB hard disk.
-
-CVE-2008-2252 is a typical TOCTOU vulnerability which is analyzed as a example in many previous researches. To evaluate the effectiveness of our mitigation, We tested it on a desktop with Windows XP installed. It's troublesome to install an old Windows operating system on a modern PC, particularly, because modern chipset which integrated hard disk controller no longer support IDE mode. Hence we need ASUS AHCI driver for Windows XP, tool that can make a USB stick bootable and tool that virtualize a floppy drive~\cite{installxpskylake} for providing AHCI driver during the installation.
+In this section, we evaluates performance overhead and how it protets  operating system from real-world vulnerabilities.
 
 \subsection{Performance}
+In this section, we focus on performance evaluation. 
+As formerly mentioned, this project has two major parts, the hypervisor, and the exception handler. To accurately presents the performance impact that introduced by this mitigation. We conduct the tests in three parts.
+
+Firstly, the hypervisor plays an essential part in this project. Without it, the SMAP exception would happen within any context, even in the path of handling the previous case. Nowadays, a hypervisor is part of the infrastructure of cloud computing. Even the Windows 10 operating system brings its native hypervisor to achieve security goals.  Therefore, in those scenarios,  the performance overhead introduced by the hypervisor pre-existed. 
+
+In this part, we use the well-known benchmark SPEC 2006. We understand that this benchmark is for instruction evaluation, specifically for microarchitectural aspects, such as instruction execution, branch prediction accuracy, cache policies. We choose several programs from the set, all without GUI and computational intensive comparing to the fewer system calls. Therefore the performance overhead incurred is mainly from the hypervisor.
+
+We compare our hypervisor with vanilla OS and the native Windows 10 hypervisor used for code integrity purposes. We are not trying to compete with HVCI (Windows 10 native hypervisor) because the two hypervisors serve different objectives. But to show at what level, the end-user may accept a hypervisor by default.
+
+
+All tests run on the PC: Intel Core I5-6400 (6 GEN CPU Skylake), ASUS H110M-C mother board(Intel H110 Chipset, Realtek RTL8111H Network Controller), 8GB RAM and 500GB hard disk.
+
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/benchmark3}
@@ -17,10 +25,14 @@ CVE-2008-2252 is a typical TOCTOU vulnerability which is analyzed as a example i
   \label{fig:benchmark}
 \end{figure}
 
-We chose several non-trivial applications to demonstrate the performance overhead that introduced by our mitigation. 
+As shown in~\autoref{fig:benchmark}, the performance overhead of hypervisor alone is acceptable, on average, 3.25\%. HVCI yields a modest performance overhead of 0.81\%.
+
+Our hypervisor is slower, particularly in two benchmark programs. Learning more about computer architecture and virtualization techniques, we wish to improve our hypervisor to achieve the same performance.
+
+We chose several non-trivial applications to demonstrate the performance overhead introduced by our mitigation. Systematic mitigation is difficult, especially for an operating system as complicated as Windows. Those ones run long enough to make the tests possible.
 
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/performance3}
+  \includegraphics[width=0.47\textwidth]{figures/performance4}
   \centering
   \caption{Performance overhead in non-trivial applications. Overhead mostly being introduced on system calls that need to fetch user-mode parameters}
   \label{fig:performance}
@@ -29,7 +41,25 @@ We chose several non-trivial applications to demonstrate the performance overhea
 ~\autoref{fig:performance} shows the performance overhead of our mitigation in several non-trivial application. Some of those applications potentially could be the trampoline service of kernel TOCTOU attacks.
 For web server software such as Nginx. We test its performance by counting the accumulated response time for 10000 web requests. For compression software such as zlib, we test it with compressing large files. For sqlite3, we use speedtest1.c which is a common performance testing program.
 
-The result shows that the performance overhead is modest. Because only the system calls that have user-mode buffer as their parameters will trigger SMAP exceptions. 
+The result shows that the performance overhead is acceptable. Because only the system calls that have user-mode buffer as their parameters will trigger SMAP exceptions. 
+
+
+
+Based on our investigation through reverse-engineering and monitoring, we find that the Windows kernel's graphical module, namely, win32k.sys, has the most TOCTOU issue. Due to the nature of how the GUI subsystem drawing screen, the number of win32k system calls is tremendous, even for a simple program such as Windows notepad. The GUI system calls frequently reference user-mode variables. Some of the cases fall into the kernel TOCTOU category; the others are benign. We believe that the situation will be eased with the improvement of the new Windows kernel. Because of the formerly mentioned two causes, our mitigation incurs an unneglectable performance overhead when applied to GUI programs. If the GUI window minimized, the screen drawing related system calls are stopped, but the rest is still in service. This is the case for most server services.
+
+
+\begin{center}
+	\begin{tabular}{ l|c|c|r|r } 
+		\hline
+		Programs & Syscalls & Pages & \textbf{avg.} & Time(ms)\\ 
+		\hline
+		nginx & 500 & 5304 & 10.61 & 12312\\ 
+		apache & 500 & 4915  & 9.83 & 11339\\ 
+		notepad (GUI) & 500 & 8388 & 16.78 & 1859 \\ 
+		freecell (GUI) & 500 & 6862 & 13.72 & 1500 \\ 
+		\hline
+	\end{tabular}
+\end{center}
 
 %Therefore the programs that have more system calls tends to have a higher performance overhead. We also count the ratio of SMAP exceptions to total page fault exceptions of one process.
 
@@ -49,6 +79,8 @@ Part of the overhead is introduced due to the overall intercepting of page fault
 
 %Although we use virtualization techniques, but the hypervisor we use is a very simple one. Unlike commercial virtualization solutions such as VMWare, Xen and Qemu+Kvm, ours doesn't emulate any hardware devices nor intercept further page mapping translate that between host and guest. Only several types of VM-Exit is inevitable such as control register accessing which we do need to handle it too.
 
+
+CVE-2008-2252 is a typical TOCTOU vulnerability which is analyzed as a example in many previous researches. To evaluate the effectiveness of our mitigation, We tested it on a desktop with Windows XP installed. It's troublesome to install an old Windows operating system on a modern PC, particularly, because modern chipset which integrated hard disk controller no longer support IDE mode. Hence we need ASUS AHCI driver for Windows XP, tool that can make a USB stick bootable and tool that virtualize a floppy drive~\cite{installxpskylake} for providing AHCI driver during the installation.
 \subsection{Case Study}
 
 We write a proof-of-concept(POC) program to test our mitigation against CVE-2008-2252. It triggers the TOCTOU vulnerability to introduce a memory buffer overflow. 
