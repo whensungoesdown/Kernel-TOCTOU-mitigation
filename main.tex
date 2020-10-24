@@ -102,6 +102,7 @@
 \usepackage[bookmarks=false]{hyperref}
 \let\labelindent\relax
 
+
 %packages
 \usepackage{graphicx} % for scalebox, listings uses it
 \usepackage{color} % for lstdefinestyle in common/listings
@@ -111,6 +112,13 @@
 \usepackage{algorithm, algorithmicx}
 \usepackage{setspace} % for \singlespacing
 \usepackage{enumitem} %for \begin{itemize}[leftmargin=*]
+
+% for the big cross-column table 
+\usepackage{array}
+\newcolumntype{G}{>{\centering\arraybackslash}m{1.3cm}}
+\newcolumntype{S}{>{\centering\arraybackslash}m{1.2cm}}
+%\renewcommand{\arraystretch}{1.5}
+%
 %packages
 
 
@@ -364,7 +372,6 @@
 
 % correct bad hyphenation here
 \hyphenation{op-tical net-works semi-conduc-tor}
-
 
 \begin{document}
 %
