@@ -23,7 +23,7 @@ Now we have a efficient hardware mechanism that can inform us whenever there is 
 The memory management unit(MMU) in x86 architecture use page tables to map between virtual and physical pages~\cite{intelpaging}. Every page in the virtual memory has corresponding page table entries. As shown in~\autoref{fig:pte}, it contains bits that describes the page. For example, whether a page belongs to kernel or user depends on the 'User/Supervisor' bit. If the bit is set, then this page is a user page; if not, it's a kernel page. Obviously, user pages can be accessed by both user code and kernel code, but kernel pages can only be accessed by kernel code. 
 
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/pte}
+  \includegraphics[width=0.40\textwidth]{figures/pte}
   \centering
   \caption{U/S, the 'User/Supervisor' bit, controls access to the page based on privilege level. If the bit is set, then this page is considered in user mode space and be accessed by all code; if the bit is not set, then it's considered in kernel mode space and can be accessed only by kernel mode code. }
   \label{fig:pte}
@@ -35,7 +35,7 @@ When handling a page fault exception, the faulting virtual address is always sto
 When the page is in kernel space, it's protected from user code accesses, as shown in~\autoref{fig:denyuserwrite}.
 
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/denyuserwrite}
+  \includegraphics[width=0.40\textwidth]{figures/denyuserwrite}
   \centering
   \caption{}
   \label{fig:denyuserwrite}
@@ -62,7 +62,7 @@ Kernel reads/writes and user reads make the page transit from spaces and change 
 Subject to the x86 architecture, the hardware mechanism works only on page granularity, meaning one page can't be partially protected. So our approach is the following. Since pages only need to be protected during the ongoing syscall, when a thread tries to write data during the time, we make the thread wait until the ongoing syscall ends. More specifically, the thread waits inside the page fault handler, giving up it's CPU time slice. 
 
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/reexecute}
+  \includegraphics[width=0.40\textwidth]{figures/reexecute}
   \centering
   \caption{}
   \label{fig:reexecute}
@@ -88,7 +88,7 @@ We hook a Windows internal function in order to know when it's the end of the sy
 
 \begin{comment}
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/timeline}
+  \includegraphics[width=0.40\textwidth]{figures/timeline}
   \centering
   \caption{The page protection period is within one system call cycle, this is based on the fact that kernel TOCTOU vulnerability does not happen across system calls.}
   \label{fig:timeline}
@@ -120,7 +120,7 @@ SMAP is enabled when the SMAP bit in the CR4 is set. So the idea is to set it du
 Fortunately, Intel's virtualization technology allows us to capture that event. Operation on control registers cause the virtual machine (VM, the OS in guest mode in this case)to exit to the root mode(hypervisor). For example, "MOV CR3, EAX" is a typical instruction when setting the CR3, where EAX has the new page table root. Every time when the system does that, our hypervisor gets a chance to get involved.
 
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/processmap}
+  \includegraphics[width=0.40\textwidth]{figures/processmap}
   \centering
   \caption{SMAP is only enabled on the target process. In other words, only target process can trigger SMAP exceptions.}
   \label{fig:processmap}
