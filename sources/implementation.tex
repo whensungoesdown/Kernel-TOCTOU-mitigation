@@ -199,6 +199,7 @@ The primary local APIC facility for issuing IPIs is the interrupt command regist
   \label{fig:icr}
 \end{figure}
 
+In this project, we find a Windows kernel internal function, KeFlushSingleTb(). It sends IPI to all processors to invalid a particular TLB entry, as mentioned above. The hardware abstraction layer (HAL) eventually sends the IPI, so the kernel does not need to mind the actual hardware differences.
 
 
 \subsection{Crashing a Faulty Thread}
