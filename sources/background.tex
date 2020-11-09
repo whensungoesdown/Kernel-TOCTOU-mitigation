@@ -45,34 +45,31 @@ Kernel TOCTOU vulnerabilities are found among many commercial operating system k
 ~\autoref{table:cves}.
 
 \begin{center}
-\begin{table}
+\begin{table}[ht]
 %\singlespacing
-\scalebox{0.8}{
-\begin{tabular}{||c c c||}
-\hline
-Id & Affected System & Vendor \\ [0.5ex]
-\hline
-\hline
-CVE-2008-2252 & Windows & Microsoft \\
-CVE-2013-1280 & Windows & Microsoft \\
-CVE-2018-5189 & Windows & Jungle Windrive \\
-... & & \\
-
-CVE-2016-5728 & Linux & Linux \\
-CVE-2016-6130 & Linux & Linux \\
-... & & \\
-
-CVE-2016-10439 & Android & Qualcomm \\
-CVE-2016-10383 & Android & Qualcomm \\
-... & & \\
-
-CVE-2016-7624 & macOS & Apple \\
-CVE-2017-7115 & iOS & Apple \\
-\hline
-
-\end{tabular}}
-\caption{Some of the kernel TOCTOU vulnerabilities.}
+%\scalebox{0.8}{
+\small
+\caption{vulnerability categories as race condition or time-of-check-to-time-of-use in CVE database}
 \label{table:cves}
+\centering
+	\begin{tabular}{@{}>{\raggedright\arraybackslash}m{2.30cm}@{}|
+			@{}>{\centering\arraybackslash}m{1.30cm}@{}|
+			@{}>{\centering\arraybackslash}m{2.30cm}@{}|
+			@{}>{\centering\arraybackslash}m{1.20cm}@{} } 
+\hline
+CVE-ID & Affected System & CVE-ID & Affcted System \\ %[0.5ex]
+\hline
+CVE-2008-2252  & Windows & CVE-2016-5728 & Linux \\
+CVE-2013-1280  & Windows & CVE-2016-6130 & Linux \\
+CVE-2018-7249  & Windows & CVE-2020-9796 & macOS \\ 
+CVE-2020-9839  & macOS   & CVE-2020-9990 & macOS \\
+CVE-2016-10439 & Android & CVE-2016-7624 & macOS \\
+CVE-2016-10383 & Android & CVE-2017-7115 & iOS \\
+
+CVE-2020-5967  & Nvidia  & CVE-2020-8680 & Intel \\
+\hline
+
+\end{tabular}
 \end{table}
 \end{center}
 
