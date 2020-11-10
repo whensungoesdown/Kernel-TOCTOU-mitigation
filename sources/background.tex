@@ -7,14 +7,21 @@
 
 Time Of Check to Time Of Use is a class of software bug caused by changes in a system between the checking of a condition and the use of the results of that check. Normally some data changes, such as an variable. In general, it's an example of race conditions.
 
-This issue has been addressed by many research work ~\cite{dean2004fixing}~\cite{borisov2005fixing}. A classic TOCTOU problem is something looks like this:
+This issue has been addressed by many research work ~\cite{dean2004fixing}~\cite{borisov2005fixing}. A classic TOCTOU is similar to the following pseudocode:
 
+
+\begin{figure}[th]
+	\includegraphics[width=0.47\textwidth]{figures/toctou}
+	\centering
+	\caption{A classic TOCTOU problem pseudocode.}
+	\label{fig:toctou}
+\end{figure}
 
 %\begin{lstlisting}[basicstyle=\small,style=redkeyword]
-\begin{lstlisting}[style=code]
-if (access(pathname, R\_OK) == 0)
-    if ((fd = open(pathname, O\_RDONLY)) == 0) ...
-\end{lstlisting}
+%\begin{lstlisting}[style=code]
+%if (access(pathname, R\_OK) == 0)
+%    if ((fd = open(pathname, O\_RDONLY)) == 0) ...
+%\end{lstlisting}
 
 This could be a piece of code in a setuid program. It first checks whether pathname is readable, and if so, open the file for reading. 
 
@@ -33,7 +40,7 @@ To the best of our knowledge, this is the first study that proposes a new run-ti
 
 \subsection{Kernel TOCTOU Vulnerability}
 
-Modern operating system such as Windows and Linux usually has two modes of operation, kernel mode and user mode. Operating system's kernel runs in kernel mode, it has complete access to all of the computer's hardware, and it controls the switching between the CPU modes. Kernel provides most of the system's functionality including file system, network, scheduling, displaying and etc., through hundreds of "system calls". System calls provide an essential interface between a process and the operating system. The rest of the programs runs in user mode. 
+Modern operating system such as Windows and Linux usually has two modes of operation, kernel mode and user mode. Operating system's kernel runs in kernel mode, it has complete access to all of the computer's hardware, and it controls the switching between the CPU modes. Kernel provides most of the system's functionality including file system, network, scheduling, displaying and etc., through hundreds of system calls. System calls provide an essential interface between a process and the operating system. The rest of the programs runs in user mode. 
 
 User programs make system calls with parameters to get services from kernel. Those parameters could be constant number, pointers, and data structures. Top level parameters will be copied from user stack to kernel stack by the system call dispatcher, because of that, they are not changeable. But there are parameters that contains sub-level pointers which points to user-mode memory. Operating system may references those when handling a system call. Or even worse, as we mentioned earlier, OS kernel may even store/fetch data directly to/from user space, crossing syscalls. Without the protection of kernel space, those user mode data can be accessed by any user thread that within the same process. Even though the syscall is made by the attacker himself in unprivileged level, but tricking the kernel to do unintended operations or further run arbitrary code is essential to root the system.     
 
@@ -77,41 +84,50 @@ CVE-2020-5967  & Nvidia  & CVE-2020-8680 & Intel \\
 
 %Notice that large part of the vulnerabilities of this table (from CVE-2013-1248 to CVE-2013-1280) are fixed in one Windows patch MS13-016, they are found by Gynvael Coldwind and Mateusz Jurczyk with Google Security Team. Due to the nature of kernel TOCTOU, it's difficult to exposure them in normal ways of testing or daily usage, until certain pattern and methods are found~\cite{jurczyk2013identifying}.  
 
-\begin{comment}
-\begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{toctouexample}
-  \centering
-  \caption{Sample code which has TOCTOU vulnerability. Data with in user space is referenced twice during a kernel pool allocation and data copying. ~\cite{jurczyk2013identifying}~\cite{ms08061}}
-  \label{fig:toctouexample}
-\end{figure}
-\end{comment}
+%\begin{comment}
+%\begin{figure}[th]
+%  \includegraphics[width=0.47\textwidth]{toctouexample}
+%  \centering
+%  \caption{Sample code which has TOCTOU vulnerability. Data with in user space is referenced twice during a kernel pool allocation and data copying. ~\cite{jurczyk2013identifying}~\cite{ms08061}}
+%  \label{fig:toctouexample}
+%\end{figure}
+%\end{comment}
 
 
 %lst:vulnerablecode
-\begin{lstlisting}[style=code,caption={An snippet of Windows device driver code that mimic the vulnerability that fixed in ms08-061. The vulnerable user-mode variable is marked in red.}\label{lst:vulnerablecode}, captionpos=b]
-// lParam points to data located in user space
-void win32k_function(... LPARAM @lParam@, ...) 
-{
-    DWORD cbCapture;
-    ...
-    @my_struct@ = (PMY_STRUCT)@lParam@;
+%\begin{lstlisting}[style=code,caption={An snippet of Windows device driver code that mimic the vulnerability that fixed in ms08-061. The vulnerable user-mode variable is marked in red.}\label{lst:vulnerablecode}, captionpos=b]
+%// lParam points to data located in user space
+%void win32k_function(... LPARAM @lParam@, ...) 
+%{
+%    DWORD cbCapture;
+%    ...
+%    @my_struct@ = (PMY_STRUCT)@lParam@;
+%
+%    // first fetch
+%    cbCapture = sizeof(MY_STRUCT) + @my_struct->cbData@;  
+%    ...
+%    pNew = UserAllocPoolWithQuota(cbCapture, TAG_SMS_CAPTURE)
+%    if (pNew != NULL) 
+%    {
+%        RtlCopyMemory(pNew, my_struct, sizeof(MY_STRUCT);
+%        // second fetch
+%        RtlCopyMemory(pNew, my_struct->lpData, @my_struct->cbData@);   
+%    }
+%    ...
+%}
+%
+%\end{lstlisting}
 
-    // first fetch
-    cbCapture = sizeof(MY_STRUCT) + @my_struct->cbData@;  
-    ...
-    pNew = UserAllocPoolWithQuota(cbCapture, TAG_SMS_CAPTURE)
-    if (pNew != NULL) 
-    {
-        RtlCopyMemory(pNew, my_struct, sizeof(MY_STRUCT);
-        // second fetch
-        RtlCopyMemory(pNew, my_struct->lpData, @my_struct->cbData@);   
-    }
-    ...
-}
 
-\end{lstlisting}
+\begin{figure}[th]
+	\includegraphics[width=0.47\textwidth]{figures/code08061}
+	\centering
+	\caption{Pseudocode of the vulnerability fixed in ms08-061. The vulnerable variable is in red. The kernel reads it twice, and it may get a different value for the buffer allocation and the subsequent buffer copying. It is common to see such a coding style. However, it is vulnerable because the two reads cross the privilege boundary.}
+	\label{fig:code08061}
+\end{figure}
 
-Listing~\ref{lst:vulnerablecode} shows an snippet of Windows kernel code~\cite{jurczyk2013identifying}. A buffer first being allocated from kernel heap, and its size is determined from a user-mode variable. Later that user mode variable has been used again as a parameter to RtlCopyMemory(). This pseudo code mimics a vulnerability that has been identified and patched in ms08-061. More specifically, parameter "lParam" is provided by user program when calling win32k\_function(), it points to a data structure "my\_struct" which could be located in user space (Actually there is some validation in the wrapper function, but it can be bypassed.). Even though the value of "lParam" could not be changed, the data field "cbData" can. Notice that "my\_struct"-$>$cdData appears twice, first when allocating a buffer, the next time is when copying the buffer. During the time window, if the attacker changes "my\_struct"-$>$cbData to a larger value, it will cause a kernel pool buffer overflow. 
+
+~\autoref{fig:code08061} shows an snippet of Windows kernel code~\cite{jurczyk2013identifying}. A buffer first being allocated from kernel heap, and its size is determined from a user-mode variable. Later that user mode variable has been used again as a parameter to RtlCopyMemory(). This pseudo code mimics a vulnerability that has been identified and patched in ms08-061. More specifically, parameter lParam is provided by user program when calling \texttt{win32k\_function()}, it points to a data structure \texttt{my\_struct} which could be located in user space (Actually there is some validation in the wrapper function, but it can be bypassed.) Even though the value of lParam could not be changed, the data field cbData can. Notice that \texttt{my\_struct->cbData} appears twice, first when allocating a buffer, the next time is when copying the buffer. During the time window, if the attacker changes \texttt{my\_struct->cbData} to a larger value, it will cause a kernel pool buffer overflow. 
 
 The timing need to be perfect, or the attacker can do it multiple times until success. It's possible to conduct this attack on both single processor system and multiple processor system. The latter is preferable and actually it's a more common setting nowadays, but this attack can happen on a single processor system too. For example, technique such as trying to make a context switch between UserAllocPoolWithQuota() and RtlCopyMemory().
 
@@ -133,10 +149,10 @@ Kernel TOCTOU only needs accurate timing and memory writing, it's too plain to t
 
 It's a security feature since Broadwell microarchitecture. It prevents operating system kernel directly accessing user-mode memory, which raises an exception. The intension is to stop transferring malicious payload from user space to kernel space.
 
-SMAP is enabled when the SMAP bit(21) in the CR4 is set. SMAP can be temporarily disabled for explicit memory accesses by setting the EFLAGS.AC (Alignment Check) flag. Because kennel does need to legally get data from user space, two more new instructions "STAC" (set AC flag) and "CLAC" (clear AC flag) are provided to accomplish that. The idea is that the kernel should be aware of when it's doing so. 
+SMAP is enabled when the SMAP bit(21) in the CR4 is set. SMAP can be temporarily disabled for explicit memory accesses by setting the EFLAGS.AC (Alignment Check) flag. Because kennel does need to legally get data from user space, two more new instructions STAC (set AC flag) and CLAC (clear AC flag) are provided to accomplish that. The idea is that the kernel should be aware of when it's doing so. 
 
-For example, Linux kernel support for SMAP since version 3.7. All the accesses to user mode memory must go through two gateway functions copy\_to\_user() and copy\_from\_user(), where SMAP is temporarily disabled.
+For example, Linux kernel support for SMAP since version 3.7. All the accesses to user mode memory must go through two gateway functions \texttt{copy\_to\_user()} and \texttt{copy\_from\_user()}, where SMAP is temporarily disabled.
 
-However, Windows doesn't support SMAP yet. Different from Linux's approach, each of Windows syscalls tends to "probe" and "capture" user-mode data itself. Probing usually done by function ProbeForRead()~\cite{probeforread} and ProbeForWrite() to check the validity of the buffers, it also checks if a user mode buffer actually resides in the user space by simply compare its address to a pre-defined value. Since some modules such as win32k.sys are highly coupled with user-mode components, it will cost huge engineering effort to change the way it retrieve user-mode data.
+However, Windows doesn't support SMAP yet. Different from Linux's approach, each of Windows syscalls tends to ``probe'' and ``capture'' user-mode data itself. Probing usually done by function ProbeForRead()~\cite{probeforread} and ProbeForWrite() to check the validity of the buffers, it also checks if a user mode buffer actually resides in the user space by simply compare its address to a pre-defined value. Since some modules such as win32k.sys are highly coupled with user-mode components, it will cost huge engineering effort to change the way it retrieve user-mode data.
 
-In Linux, even though copy\_*\_user() is mandated~\cite{corbet2012linuxsmap}, it still suffers from TOCTOU vulnerability such as mistake of using function copy\_from\_user() twice for the same variable~\cite{double-fetch-linux}. 
+In Linux, even though \texttt{copy\_*\_user()} is mandated~\cite{corbet2012linuxsmap}, it still suffers from TOCTOU vulnerability such as mistake of using function \texttt{copy\_from\_user()} twice for the same variable~\cite{double-fetch-linux}. 

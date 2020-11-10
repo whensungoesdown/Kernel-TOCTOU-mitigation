@@ -25,7 +25,7 @@ We do not actually emulate any hardware device, we put the current system into a
 
 
 \subsection{Page Faults}
-Handling exceptions is the major part of this mitigation. The type we need to handle is page fault exception. They may be caused directly by SMAP or by our protection on the pages. Even though it's called "page fault", but not all exceptions are due to program errors. For example, page fault is one part of paging mechanism in x86 architecture to make the virtual memory much larger then the physical memory that exists in the system. 
+Handling exceptions is the major part of this mitigation. The type we need to handle is page fault exception. They may be caused directly by SMAP or by our protection on the pages. Even though it's called ``page fault'', but not all exceptions are due to program errors. For example, page fault is one part of paging mechanism in x86 architecture to make the virtual memory much larger then the physical memory that exists in the system. 
 
 We need to handle all the page fault exceptions before the system's handler does. Some of the them need to be passed to the operating system, for example, those invalid pages. And the others need to be intercepted. There is a 32-bit error code being pushed into the kernel stack when exception triggered, as shown in~\autoref{fig:pagefaulterrorcode}.
 
@@ -37,9 +37,9 @@ We need to handle all the page fault exceptions before the system's handler does
   \label{fig:pagefaulterrorcode}
 \end{figure}
 
-The bits don't clearly indicate the cause. For example, there is no "SMAP" bit. So our page fault handler needs to collect more information in order to tell the possible reason for the exception. Register values of EIP, CS, ESP, SS, EFLAGS are also pushed into the kernel stack with the error code. We also get the page table root from CR3 and the faulting virtual address from CR2.
+The bits do not clearly indicate the cause. For example, there is no ``SMAP'' bit. So our page fault handler needs to collect more information in order to tell the possible reason for the exception. Register values of EIP, CS, ESP, SS, EFLAGS are also pushed into the kernel stack with the error code. We also get the page table root from CR3 and the faulting virtual address from CR2.
 
-First, We need to screen out some of the cases that are irrelevant. For example, When exceptions come in with "P" bit unset, indicating that the page is not present in the memory. It's part of the paging mechanism, pages can be swapped out to secondary storage such as hard disk. Even our page fault handler itself may trigger this type of page faults. Since page tables are reside in the page-able pages, so when we walk through the page table, some of the PTE pages may not be there. Therefore we need to pass such page faults to operating system as soon as possible, otherwise it will cause a dead loop inside our handler. We also observe that there is no exception caused both by non-present page and SMAP at the same time, so it's safe to do so.
+First, We need to screen out some of the cases that are irrelevant. For example, When exceptions come in with ``P'' bit unset, indicating that the page is not present in the memory. It's part of the paging mechanism, pages can be swapped out to secondary storage such as hard disk. Even our page fault handler itself may trigger this type of page faults. Since page tables are reside in the page-able pages, so when we walk through the page table, some of the PTE pages may not be there. Therefore we need to pass such page faults to operating system as soon as possible, otherwise it will cause a dead loop inside our handler. We also observe that there is no exception caused both by non-present page and SMAP at the same time, so it's safe to do so.
 
 After screen out unrelated exceptions, the algorithm that handles mitigation related exceptions is shown in Algorithm~\ref{algo:pagefaulthandler}.
 
@@ -90,7 +90,7 @@ After screen out unrelated exceptions, the algorithm that handles mitigation rel
 
 
 
-Another technical detail we should mention is that when entering page fault handler, interrupts are tuned off automatically. This is because exception is raised through an "interrupt gate". The CPU clears the IF(Interrupt enable flag) in the EFLAGS register and sets it back when interrupts return. In our case, after getting the faulting virtual address from CR2, we immediately set the IF flag by executing instruction "STI" in order to let the processor being able to receive nested exceptions.
+Another technical detail we should mention is that when entering page fault handler, interrupts are tuned off automatically. This is because exception is raised through an ``interrupt gate''. The CPU clears the IF(Interrupt enable flag) in the EFLAGS register and sets it back when interrupts return. In our case, after getting the faulting virtual address from CR2, we immediately set the IF flag by executing instruction STI in order to let the processor being able to receive nested exceptions.
 
 \subsection{Updating PTE}
 
@@ -126,7 +126,7 @@ typedef struct _PTE {
 \end{lstlisting}
 
 
-Usually, in C code, we write something like the following to update a bit field. Where pPte is a pointer that points to a PTE. We want to update its "U/S bit", which is the "Owner". By setting it to 0, we set the page as a kernel page. 
+Usually, in C code, we write something like the following to update a bit field. Where pPte is a pointer that points to a PTE. We want to update its ``U/S bit'', which is the ``Owner''. By setting it to 0, we set the page as a kernel page. 
 
 \begin{lstlisting}[style=code] 
 pPte->u.Hard.Owner = 0;
@@ -145,7 +145,7 @@ The assembly code is generated by compiler, it needs three instructions to updat
 
 To solve it, we first choose to use spinlocks to synchronize all the PTE updating operation within our module. The spinlocks do cause extra performance overhead, but it only becomes significant when under attack. Under normal circumstances, the performance overhead is modest, as evaluated in~\autoref{sec:evaluation}.  
 
-Later we learned that Intel supports locked atomic operations on memory locations. One of the mechanism is bus locking, which use the "LOCK" instruction prefix~\cite{intelmanualchapter8}. For example, to set/unset bits in a PTE, we can use the following instructions.
+Later we learned that Intel supports locked atomic operations on memory locations. One of the mechanism is bus locking, which use the ``LOCK'' instruction prefix~\cite{intelmanualchapter8}. For example, to set/unset bits in a PTE, we can use the following instructions.
 
 \begin{lstlisting}[style=code] 
 mov eax, 'addr'
@@ -183,11 +183,11 @@ The external I/O APIC is part of Intel's system chipset. It is responsible for r
 \begin{figure}[th]
   \includegraphics[width=0.40\textwidth]{figures/ia32apicbase}
   \centering
-  \caption{IA32\_APIC\_BASE MSR}
+  \caption{\texttt{IA32\_APIC\_BASE} MSR}
   \label{fig:ia32apicbase}
 \end{figure}
 
-There is only one MSR associated with local APIC, IA32\_APIC\_BASE. As shown in~\autoref{fig:ia32apicbase}, the BSP flag indicates if the processor is the bootstrap processor (BSP); "APIC global enable/disable" enables/disables the APIC; APIC base specifies the base address of the APIC registers. This 24-bit value needs to be extended by 12 bits at the low end to form the base address. As formerly mentioned, this value by default is 0xFEE00000.
+There is only one MSR associated with local APIC, \texttt{IA32\_APIC\_BASE}. As shown in~\autoref{fig:ia32apicbase}, the BSP flag indicates if the processor is the bootstrap processor (BSP); ``APIC global enable/disable'' enables/disables the APIC; APIC base specifies the base address of the APIC registers. This 24-bit value needs to be extended by 12 bits at the low end to form the base address. As formerly mentioned, this value by default is 0xFEE00000.
 
 The primary local APIC facility for issuing IPIs is the interrupt command register (ICR), as shown in~\autoref{fig:icr}. It is a 64-bit local APIC register that allows the operating system to specify and send IPIs to processors in the system.
 
@@ -206,12 +206,12 @@ In this project, we find a Windows kernel internal function, KeFlushSingleTb(). 
 
 As mentioned earlier, to solve the problem that a user thread tries to write a protected page, instead of crashing the thread immediately, our approach is to hold the thread for some milliseconds, waiting for the function to end. To avoid any deadlock or blockage caused by a faulty program, we only allow for several retries. 
 
-Since it's troublesome to call a series of undocumented functions to handle exceptions. We choose to let the operating system terminating it. We clears "p" bit of the corresponding PTE as well as changing the error code to a value that indicates "accessing an invalid page" instead of "writing an read-only page". Because we can't synchronize with MMU, when we passing the exception to the original page fault handler, the PTE's attributes could be changed within the short period of time due to another SMAP exception, this could happen especially in the attacking scenario. 
+Since it's troublesome to call a series of undocumented functions to handle exceptions. We choose to let the operating system terminating it. We clears ``p'' bit of the corresponding PTE as well as changing the error code to a value that indicates ``accessing an invalid page'' instead of ``writing an read-only page''. Because we can't synchronize with MMU, when we passing the exception to the original page fault handler, the PTE's attributes could be changed within the short period of time due to another SMAP exception, this could happen especially in the attacking scenario. 
 
 %global hook, it may use shared memory,  before put it here, probably should figure out how page permits works on shared page
 
 
 \subsection{Special Cases}
-We assume 32bit Windows operating system use the default 2G/2G user/kernel split where user space is below 0x7FFFFFFF. More precisely, a kernel variable MmUserProbeAddress contains the highest possible address for user data, which is set to 0x7FFF0000. And we learn that one page locates at 0x7FFE0000 is defined as USER\_SHARED\_DATA. It's a shared page between user mode and kernel mode, meaning the same physical page is mapped both at 0x7FFE0000 and 0xFFDF0000. It's a read-only page and contains a lot of process settings such as system time. Kernel needs to read this page a lot. We treat such page specially to improve performance. 
+We assume 32bit Windows operating system use the default 2G/2G user/kernel split where user space is below 0x7FFFFFFF. More precisely, a kernel variable MmUserProbeAddress contains the highest possible address for user data, which is set to 0x7FFF0000. And we learn that one page locates at 0x7FFE0000 is defined as \texttt{USER\_SHARED\_DATA}. It's a shared page between user mode and kernel mode, meaning the same physical page is mapped both at 0x7FFE0000 and 0xFFDF0000. It's a read-only page and contains a lot of process settings such as system time. Kernel needs to read this page a lot. We treat such page specially to improve performance. 
 
 
