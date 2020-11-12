@@ -134,10 +134,10 @@ The timing need to be perfect, or the attacker can do it multiple times until su
 On multiple processor system, the attacker could create another thread and attach it to a specific processor. As shown in~\autoref{fig:toctouasm}, the attacking thread keeps flipping the variable's bit in a loop, try to feed the two values into the vulnerable function during the time window.
 If the timing is not accurate or maybe the attacker flips too many times, the kernel won't crash, only when the first fetch get a smaller value and the second fetch get a larger value, the vulnerability will be triggered.
 
-\begin{figure}[h]
-  \includegraphics[width=0.47\textwidth]{figures/toctouasm}
+\begin{figure}[ht]
+  \includegraphics[width=0.47\textwidth]{figures/toctouasm3}
   \centering
-  \caption{The attacking thread could be as simple as several instructions in a loop.}
+  \caption{Thread 0 runs the vulnerable system call in the kernel-mode. The attacker can repeatedly call it to open the attack time window multiple times. Simultaneously, the other user-mode thread created by the attacker tries to flip the user-mode variable in-between the time window. So that the kernel code, two times, get the value differently.}
   \label{fig:toctouasm}
 \end{figure}
 

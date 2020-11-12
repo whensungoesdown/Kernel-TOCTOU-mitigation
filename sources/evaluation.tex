@@ -115,20 +115,28 @@ creates a memory descriptor list (MDL) that identifies the locked memory pages a
 
 However, the system still needs to fill in some parameters directly, such as a word-size handle from the system call ZwCreateFile. As described earlier, the kernel calls ProbeForWrite inside a try-catch block.
 
-For example, the pseudo-code for validating the filehandle parameter is similar to the following.
+For example, the code for validating the file handle parameter is similar to the following, in~\autoref{fig:probecode}.
 
 
-\begin{lstlisting}[style=code, caption={Pseudo-code of kernel validating a user-supplied variable. } \label{lst:probeforwrite}, captionpos=b]
-try {
-	...
-	*((volatile HANDLE *)Address) = *Address;
+%\begin{lstlisting}[style=code, caption={Pseudo-code of kernel validating a user-supplied variable. } \label{lst:probeforwrite}, captionpos=b]
+%try {
+%	...
+%	*((volatile HANDLE *)Address) = *Address;
+%
+%} except(EXCEPTION_EXECUTE_HANDLER) {
+%
+%	// Error handling
+%	return GetExceptionCode();
+%}
+%\end{lstlisting}
 
-} except(EXCEPTION_EXECUTE_HANDLER) {
 
-	// Error handling
-	return GetExceptionCode();
-}
-\end{lstlisting}
+\begin{figure}[th]
+  \includegraphics[width=0.47\textwidth]{figures/probecode}
+  \centering
+  \caption{Pseudo-code for validating a file handler.}
+  \label{fig:probecode}
+\end{figure}
 
 We can see that the assembly code generated always reads the variable before writing it. This coding style is another cause for the zero write access. 
 
@@ -221,9 +229,9 @@ We write a proof-of-concept(POC) program to test our mitigation against CVE-2008
 The attacking program has two threads. The main thread first allocate a page at virtual address 0, which later used as the parameter to be sent into the vulnerable syscall. The reason to choose page zero is to bypass the parameter check in syscall NtUserMessageCall. Next, right after creating another thread, it keeps calling the vulnerable function SendMessage (\texttt{WM\_COPYDATA}) with the malicious parameters in a loop, which eventually calls the vulnerable win32k function xxxInterSendMsgEx. The created thread then keep modifying the parameter at page zero, also in a loop, simultaneously.
 
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/ms08061case}
+  \includegraphics[width=0.47\textwidth]{figures/ms08061case2}
   \centering
-  \caption{The user page will be protected right at the moment it's been referenced.}
+  \caption{The attack thread tries to flip the data within the attack window, between instruction circle-2 and circle-3. The kernel first touches the page at instruction circle-1, then the mitigation protects it afterward until the end of the current system call, creating the larger page-protect-window. As soon as the attack thread writes the protected page, the page fault handler suspends it until the protection ends.}
   \label{fig:ms08061case}
 \end{figure}
 
@@ -234,19 +242,27 @@ CVE-2013-1254 is another typical TOCTOU vulnerability that found in Windows win3
 
 %A series of same kind of vulnerability found in 26 functions of module win32k.
 
-\begin{lstlisting}[style=code] 
-.text:BF8A993F   mov   eax, _W32UserProbeAddr
-                       .
-                       .
-.text:BF8A9973   @cmp   [ecx+8], eax@    
-.text:BF8A9976   jnb   short loc_BF8A997B
-.text:BF8A9978   @mov   eax, [ecx+8]@    
-.text:BF8A997B
-.text:BF8A997B loc_BF8A997B:                           
-.text:BF8A997B   mov   ecx, [eax]
-.text:BF8A997D   mov   eax, [eax+4]
-\end{lstlisting}
-%\captionof{lstlisting}{Flawed code in win32k.sys function SfnINOUTSTYLECHANGE()}
+%\begin{lstlisting}[style=code] 
+%.text:BF8A993F   mov   eax, _W32UserProbeAddr
+%                       .
+%                       .
+%.text:BF8A9973   @cmp   [ecx+8], eax@    
+%.text:BF8A9976   jnb   short loc_BF8A997B
+%.text:BF8A9978   @mov   eax, [ecx+8]@    
+%.text:BF8A997B
+%.text:BF8A997B loc_BF8A997B:                           
+%.text:BF8A997B   mov   ecx, [eax]
+%.text:BF8A997D   mov   eax, [eax+4]
+%\end{lstlisting}
+%%\captionof{lstlisting}{Flawed code in win32k.sys function SfnINOUTSTYLECHANGE()}
+
+\begin{figure}[th]
+  \includegraphics[width=0.47\textwidth]{figures/cve-2013-1254}
+  \centering
+  \caption{In the vulnerable assembly code of CVE-2013-1254, the two fetches are marked in red.}
+  \label{fig:cve-2013-1254}
+\end{figure}
+
 
 The flawed function first fetch a value from ``ecx+8'' and compare it with \texttt{\_W32UserProbeAddress} which is a value that indicates the highest possible address for user-mode variables. It confirms that the variable is actually reside in user space. Next, it fetches the value again and assign it to eax. This is where the double fetch happens. The attacker can change the value between those two fetches, letting it bypass the verification,  then assign it a kernel space address.
 
