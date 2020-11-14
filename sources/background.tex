@@ -5,15 +5,16 @@
 
 %In this section , we talk about the background knowledge of kernel TOCTOU vulnerability, how it happens. Also SMAP feature of Intel processor, how to leverage it as the core mechanism to prevent kernel TOCTOU attacks.  
 
-Time Of Check to Time Of Use is a class of software bug caused by changes in a system between the checking of a condition and the use of the results of that check. Normally some data changes, such as an variable. In general, it's an example of race conditions.
+%Time Of Check to Time Of Use is a class of software bug caused by changes in a system between the checking of a condition and the use of the results of that check. Normally some data changes, such as an variable. In general, it's an example of race conditions.
 
-This issue has been addressed by many research work ~\cite{dean2004fixing}~\cite{borisov2005fixing}. A classic TOCTOU is similar to the following pseudocode:
+%This issue has been addressed by many research work ~\cite{dean2004fixing}~\cite{borisov2005fixing}. A classic TOCTOU is similar to the following pseudocode:
 
+TOCTOU is a vulnerability class caused by changes in a system between checking a condition and using that check results. Typically, a variable changes after it passes the sanity check. Many previous research works has addressed this issue~\cite{dean2004fixing}~\cite{borisov2005fixing}. ~\autoref{fig:toctou} shows a classic TOCTOU issue.
 
 \begin{figure}[th]
 	\includegraphics[width=0.47\textwidth]{figures/toctou}
 	\centering
-	\caption{A classic TOCTOU problem pseudocode.}
+	\caption{The gap between access() and open() leaves the attack time window for the attacker to make changes in the file system.}
 	\label{fig:toctou}
 \end{figure}
 
@@ -23,20 +24,16 @@ This issue has been addressed by many research work ~\cite{dean2004fixing}~\cite
 %    if ((fd = open(pathname, O\_RDONLY)) == 0) ...
 %\end{lstlisting}
 
-This could be a piece of code in a setuid program. It first checks whether pathname is readable, and if so, open the file for reading. 
-
-But the problem is that the pair of access() and open() system calls is not a single atomic operation. Image right after the syscall access(), a malicious user could change the file system, then the setuid program is tricked into opening a file that it should not. 
 
 
-TOCTOU vulnerability essentially happens between security boundary, less privileged part trick the privileged part to performance some illegal operations. In the file related TOCTOU vulnerability, it's the setuid program that being tricked because it has more privilege than the current user. The characteristics is the two syscall(access() and open())that leaves gap in between. That is the time windows for the less privileged user to conduct the attack. The root cause is that sequences of syscalls offer no guarantees as to atomicity. 
+Assume this code piece belongs to a setuid program. It first validates that the ``pathname'' is readable, and if so, open the file for reading. However, the attacker can change the file system between the two system calls to trick the setuid program into opening a file that it should not.
 
+Essentially, TOCTOU vulnerability occurs between security boundaries. The less privileged sector deceives the privileged sector to do unexpected actions. The non-atomic or repeated operation on the same variable is the root cause.
 
-But is it secure if it's just one syscall? Turns out, sometimes syscall is not atomic. This is what we focused on, TOCTOU vulnerability also exists in one syscall. Now the security boundary is in between kernel code and user code. Kernel space usually is where syscall implemented and it's has the most privilege in the system. A well designed kernel should make sure that each individual syscall is atomic to the user, but due to historical reasons, some compromise has been made, for example, user code may be later put into kernel space in order to increase efficiency. Therefore it's not surprising when kennel code directly read data from user mode. And that breaks the atomic rule where the kernel may read the same data twice in a sequence, and the malicious user can change that data in between. 
+TOCTOU also happens in the operating system kernel, inside system calls. For the rest of the paper, we name it kernel-level TOCTOU. An operating system provides services such as ``program execution'', ``I/O operation'', ``file system'' to the programs on a service-client basis. When requesting a system service, the programs provide parameters, and how to invalidate them, keep them consistent during the system call is the kernel's responsibility. However, due to various reasons, the kernel may not fully decouple with the user-mode components. Therefore, directly accessing user-mode variables from the kernel is not uncommon to some operating systems, especially Windows.
 
-So we call it kernel TOCTOU vulnerability. It works as following. The attacker first send in parameters that points to legit user mode data to pass kernel sanity check first, then modify that data using another thread, simultaneously. Usually there is only a certain amount of time to operate, therefore the attacker may need to repeat the above operations as many times as needed. This type of attack normally leads to privilege escalation and it's become more and more popular in recent years.
+When the kernel repeatedly reads the same user-mode address, so-called double fetches, this type of behavior may lead to severe issues, typically local privilege escalation vulnerability. The malicious program first has a benign variable in userspace. In-between the kernel's two fetches, the program uses another thread to change the variable to bypass the parameter sanity check or introduce errors such as a buffer overflow. The time window between the two kernel fetches may be as short as several instructions,  but with careful design, the race condition created between the kernel and the user program makes it feasible, especially on a multi-processor system.
 
-
-To the best of our knowledge, this is the first study that proposes a new run-time mitigation for kernel TOCTOU vulnerability. 
 
 \subsection{Kernel TOCTOU Vulnerability}
 
