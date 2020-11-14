@@ -30,38 +30,35 @@ Assume this code piece belongs to a setuid program. It first validates that the 
 
 Essentially, TOCTOU vulnerability occurs between security boundaries. The less privileged sector deceives the privileged sector to do unexpected actions. The non-atomic or repeated operation on the same variable is the root cause.
 
+
+
+\subsection{Kernel-level TOCTOU Vulnerability}
+
+
 TOCTOU also happens in the operating system kernel, inside system calls. For the rest of the paper, we name it kernel-level TOCTOU. An operating system provides services such as ``program execution'', ``I/O operation'', ``file system'' to the programs on a service-client basis. When requesting a system service, the programs provide parameters, and how to invalidate them, keep them consistent during the system call is the kernel's responsibility. However, due to various reasons, the kernel may not fully decouple with the user-mode components. Therefore, directly accessing user-mode variables from the kernel is not uncommon to some operating systems, especially Windows.
 
-When the kernel repeatedly reads the same user-mode address, so-called double fetches, this type of behavior may lead to severe issues, typically local privilege escalation vulnerability. The malicious program first has a benign variable in userspace. In-between the kernel's two fetches, the program uses another thread to change the variable to bypass the parameter sanity check or introduce errors such as a buffer overflow. The time window between the two kernel fetches may be as short as several instructions,  but with careful design, the race condition created between the kernel and the user program makes it feasible, especially on a multi-processor system.
+When the kernel repeatedly reads the same user-mode address, so-called double fetches, this type of behavior may lead to severe issues, typically local privilege escalation vulnerability. The malicious program first has a benign variable in userspace, then uses another thread to change the variable to bypass the parameter sanity check or introduce errors such as a buffer overflow in-between the kernel's two fetches. The time window between the two kernel fetches may be as short as several instructions,  but with careful design, the race condition created between the kernel and the user program makes it feasible, especially on a multi-processor system.
 
 
-\subsection{Kernel TOCTOU Vulnerability}
 
-Modern operating system such as Windows and Linux usually has two modes of operation, kernel mode and user mode. Operating system's kernel runs in kernel mode, it has complete access to all of the computer's hardware, and it controls the switching between the CPU modes. Kernel provides most of the system's functionality including file system, network, scheduling, displaying and etc., through hundreds of system calls. System calls provide an essential interface between a process and the operating system. The rest of the programs runs in user mode. 
+The correct way of handling user-mode parameters is to ``capture'' (copy) them first, then use the kernel copy for the rest of the system call. It is better to put such standard code into gateway functions for the kernel and drivers, such as those used in the Linux kernel, \texttt{copy\_to\_user()}, and \texttt{copy\_from\_user()}.
 
-User programs make system calls with parameters to get services from kernel. Those parameters could be constant number, pointers, and data structures. Top level parameters will be copied from user stack to kernel stack by the system call dispatcher, because of that, they are not changeable. But there are parameters that contains sub-level pointers which points to user-mode memory. Operating system may references those when handling a system call. Or even worse, as we mentioned earlier, OS kernel may even store/fetch data directly to/from user space, crossing syscalls. Without the protection of kernel space, those user mode data can be accessed by any user thread that within the same process. Even though the syscall is made by the attacker himself in unprivileged level, but tricking the kernel to do unintended operations or further run arbitrary code is essential to root the system.     
-
-Therefore, it's dangerous for the kernel to reference any user-mode data directly, especially when it needs to do it more than once. The good practice is that kernel should first take a copy of the data and keep using the kernel copy instead of the original user mode data though the entire system call's life span.
-
-%The number of kernel TOCTOU vulnerability has been increasing recently. For example, the kernel mode graphic subsystem of Windows operating system, It interacts with user-mode variables frequently. The following table is the vulnerabilities that found in recent years.
-
-Kernel TOCTOU vulnerabilities are found among many commercial operating system kernels such as Windows, Linux and etc. A few of them are listed in
-~\autoref{table:cves}.
+However, due to mistakenly repeated operations on user parameters, the kernel-level TOCTOU still widely exists among operating systems already taking the aforementioned method. ~\autoref{table:cves} lists a portion of recent kernel-level TOCTOU vulnerabilities.
 
 \begin{center}
 \begin{table}[ht]
 %\singlespacing
 %\scalebox{0.8}{
 \small
-\caption{vulnerability categories as race condition or time-of-check-to-time-of-use in CVE database}
+\caption{Recent vulnerabilities categorized as race condition or time-of-check-to-time-of-use in the CVE database.}
 \label{table:cves}
 \centering
-	\begin{tabular}{@{}>{\raggedright\arraybackslash}m{2.30cm}@{}|
-			@{}>{\centering\arraybackslash}m{1.30cm}@{}|
-			@{}>{\centering\arraybackslash}m{2.30cm}@{}|
-			@{}>{\centering\arraybackslash}m{1.20cm}@{} } 
+	\begin{tabular}{@{}>{\raggedright\arraybackslash}m{2.35cm}@{}|
+			@{}>{\centering\arraybackslash}m{1.35cm}@{}|
+			@{}>{\centering\arraybackslash}m{2.35cm}@{}|
+			@{}>{\centering\arraybackslash}m{1.25cm}@{} } 
 \hline
-CVE-ID & Affected System & CVE-ID & Affcted System \\ %[0.5ex]
+CVE-ID & Affected System & CVE-ID & Affected System \\ %[0.5ex]
 \hline
 CVE-2008-2252  & Windows & CVE-2016-5728 & Linux \\
 CVE-2013-1280  & Windows & CVE-2016-6130 & Linux \\
@@ -124,12 +121,13 @@ CVE-2020-5967  & Nvidia  & CVE-2020-8680 & Intel \\
 \end{figure}
 
 
-~\autoref{fig:code08061} shows an snippet of Windows kernel code~\cite{jurczyk2013identifying}. A buffer first being allocated from kernel heap, and its size is determined from a user-mode variable. Later that user mode variable has been used again as a parameter to RtlCopyMemory(). This pseudo code mimics a vulnerability that has been identified and patched in ms08-061. More specifically, parameter lParam is provided by user program when calling \texttt{win32k\_function()}, it points to a data structure \texttt{my\_struct} which could be located in user space (Actually there is some validation in the wrapper function, but it can be bypassed.) Even though the value of lParam could not be changed, the data field cbData can. Notice that \texttt{my\_struct->cbData} appears twice, first when allocating a buffer, the next time is when copying the buffer. During the time window, if the attacker changes \texttt{my\_struct->cbData} to a larger value, it will cause a kernel pool buffer overflow. 
 
-The timing need to be perfect, or the attacker can do it multiple times until success. It's possible to conduct this attack on both single processor system and multiple processor system. The latter is preferable and actually it's a more common setting nowadays, but this attack can happen on a single processor system too. For example, technique such as trying to make a context switch between UserAllocPoolWithQuota() and RtlCopyMemory().
+~\autoref{fig:code08061} shows a piece of code from Windows Win32k module~\cite{jurczyk2013identifying}~\cite{ms08061}. This pseudo-code mimics a kernel-level TOCTOU vulnerability that has been identified and patched in ms08-061. It is part of the Win32k system call, and the code in red indicates the trace of the vulnerable code and data.  The user program passes \texttt{lParam} to \texttt{win32k\_function()} through upper layer API.  The first fetch occurs when summing up \texttt{cbCapture} with \texttt{my\_struct->cbData}, a data field offsetted from the address provided by \texttt{lParam}. The kernel allocates a buffer based on the data. However, shortly after, the kernel unnecessarily fetches this data again and uses it to copy data into the new buffer. As mentioned earlier, if the  \texttt{my\_struct->cbData} changes between the two fetches, especially when the last fetch gets a larger value, it will create a kernel heap buffer overflow. 
 
-On multiple processor system, the attacker could create another thread and attach it to a specific processor. As shown in~\autoref{fig:toctouasm}, the attacking thread keeps flipping the variable's bit in a loop, try to feed the two values into the vulnerable function during the time window.
-If the timing is not accurate or maybe the attacker flips too many times, the kernel won't crash, only when the first fetch get a smaller value and the second fetch get a larger value, the vulnerability will be triggered.
+The attack time window is small, but enough. Even on a single processor system, the attack is feasible. For example, try to introduce a thread context switch between the two fetches. Because, for a local privilege escalation vulnerability like this, the attacker can invoke such a system call as many times as he needs. On a multi-processor system, the attacker usually creates another thread to race with the kernel, aiming at enlarging the data during the time window. As shown in~\autoref{fig:toctouasm}, the attacking thread 1 keeps flipping one higher bit of the variable. The attack succeeds by chance. If the latter value is smaller or equal to the former, the system will continue without error. If otherwise, the heap buffer overflow occurs.
+
+
+
 
 \begin{figure}[ht]
   \includegraphics[width=0.47\textwidth]{figures/toctouasm3}
@@ -139,7 +137,7 @@ If the timing is not accurate or maybe the attacker flips too many times, the ke
 \end{figure}
 
 
-Once this step is accomplished, the problem becomes how to exploit it a classic heap buffer overflow. So you can see that kernel TOCTOU itself may not seems to be harmful, but it could lead to something serious. 
+%Once this step is accomplished, the problem becomes how to exploit it a classic heap buffer overflow. So you can see that kernel TOCTOU itself may not seems to be harmful, but it could lead to something serious. 
 
 \subsection{Supervisor Mode Access Prevention (SMAP)}
 Kernel TOCTOU only needs accurate timing and memory writing, it's too plain to trigger any security mechanism so far. Existed monitoring methods are either too slow or too narrow, more details in~\autoref{sec:relatedwork}. We found a Intel CPU feature, Supervisor Mode Access Prevention (SMAP) is suitable for this task. 
