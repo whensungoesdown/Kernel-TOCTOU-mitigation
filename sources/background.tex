@@ -3,14 +3,8 @@
 \section{Background}
 \label{sec:background}
 
-%In this section , we talk about the background knowledge of kernel TOCTOU vulnerability, how it happens. Also SMAP feature of Intel processor, how to leverage it as the core mechanism to prevent kernel TOCTOU attacks.  
 
-%Time Of Check to Time Of Use is a class of software bug caused by changes in a system between the checking of a condition and the use of the results of that check. Normally some data changes, such as an variable. In general, it's an example of race conditions.
-
-%This issue has been addressed by many research work ~\cite{dean2004fixing}~\cite{borisov2005fixing}. A classic TOCTOU is similar to the following pseudocode:
-
-TOCTOU is a vulnerability class caused by changes in a system between checking a condition and using that check results. Typically, a variable changes after it passes the sanity check. Many previous research works has addressed this issue~\cite{dean2004fixing}~\cite{borisov2005fixing}. ~\autoref{fig:toctou} shows a classic TOCTOU issue.
-
+TOCTOU is a vulnerability class caused by changes in a system between checking a condition and using that check results. Typically, a variable changes after it passes the sanity check. It is a classical type of issue that has two decades of history. Many previous research works have addressed this issue~\cite{dean2004fixing}~\cite{borisov2005fixing}. To distinguish it from the relatively new kernel-level TOCTOU, we briefly introduce it. ~\autoref{fig:toctou} shows a classic TOCTOU issue.
 \begin{figure}[th]
 	\includegraphics[width=0.47\textwidth]{figures/toctou}
 	\centering
