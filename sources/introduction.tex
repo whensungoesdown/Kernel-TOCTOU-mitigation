@@ -3,7 +3,7 @@
 \section{Introduction}
 \label{sec:introduction}
 
-Time-of-check-to-time-of-use (TOCTOU) is also known as ``race condition'' or ``double fetch''. It is a long-standing problem in the software security domain. As its name implied, it involves at least two references (on variables). The first reference is usually a security check.  If they passed, for example, the variable's value is not too large,  then assuming it is safe to use it, copying buffer. The variables are in a less privileged security domain. During the time gap,  an attacker could change the variable's value to a much larger one. That may introduce a buffer overflow. TOCTOU is a problem of data inconsistency and it exits in many systems nowadays and it also has many forms. In this paper, we focus on the one that happens in the operating system kernel. This type of attack not only disturbs the system status but also can lead to a serious breach.
+Time-of-check-to-time-of-use (TOCTOU) is also known as ``race condition'' or ``double fetch''. It is a long-standing problem in the software security domain. As its name implied, it involves at least two references (on variables). The first reference is usually a security check.  If they passed, for example, the variable's value is not too large,  then assuming it is safe to use it, copying buffer. The variables are in a less privileged security domain. During the time gap,  an attacker could change the variable's value to a much larger one. That may introduce a buffer overflow. TOCTOU is a problem of data inconsistency and it exists in many systems nowadays and it also has many forms. In this paper, we focus on the one that happens in the operating system kernel. This type of attack not only disturbs the system status but also can lead to a serious breach.
 
 Modern operating systems such as Windows and Linux have two modes. OS kernel runs in the most privileged mode (kernel-mode). It can access all the computer's hardware resources. It connects them to the application software through system calls. The applications run in user mode which is the least privileged mode (user-mode). It separates from the kernel. To access privileged resources, the application makes system calls with parameters. In a well-designed OS, this is a formal method for kernel and application exchanging data.
 
@@ -14,7 +14,7 @@ There are cases where the kernel read or store user-mode variables. This is poss
 
 Plain memory access is common, even it is from kernel to user space. In essence, it is a bad programming practice rather than a fault. Hence, existing solutions are either high-overhead or low-coverage.
 
-To mitigate as a run-time solution, must find such kernel behaviors in a low-cost manner. We learned that Intel's CPU series has an interesting feature. That is Supervisor Mode Access Prevention (SMAP). When enabled, it prevents the kernel from accessing user space. Such violations will raise exceptions. We call it the SMAP exception for the rest of the paper.
+To mitigate as a run-time solution, must find such kernel behaviors in a low-cost manner. We learned that Intel's CPU series has an interesting feature. That is Supervisor Mode Access Prevention (SMAP). When enabled, it prevents the kernel from accessing user space. Such violations will raise exceptions. %We call it the SMAP exception for the rest of the paper.
 
 We take control of the page fault handler.  The system should halt when it sees a SMAP exception.  Instead, we handle it and keep the system going. To protect the page, we find its corresponding page table entry (PTE) and clear the USER/SUPERVISOR bit. After this, the user page becomes a kernel page. User threads are no longer able to access it. Also, this is the only way to continue from a SMAP exception.  This page will remain in the kernel until the current system call ends.
 
@@ -31,16 +31,17 @@ The light-weight hypervisor itself is easy to configure for other applications. 
 
 
 
-The contributions of this paper:
+\textbf{Contributions.} To summarize, we make the following contributions in this paper:
 \begin{itemize}[leftmargin=*]
-    \item We investigate on kernel TOCTOU vulnerability using study cases.
-    \item A novel run-time mitigation leveraging hardware feature (SMAP). 
-    \item Evaluation with real-word vulnerabilities.
-    \item A configurable light-weight hypervisor to isolate system-wide CPU features.
-    \item A fuzzing tool for kernel TOCTOU vulnerabilities.
+    \item We identify kernel TOCTOU vulnerability using study cases, and demonstrated with practical exploits against them. 
+    \item We present \name, a novel run-time mitigation framework leveraging hardware feature (SMAP). 
+    \item We propose a configurable light-weight hypervisor to isolate system-wide CPU features.
+    \item We develop a fuzzing tool for detecting kernel TOCTOU vulnerabilities.
+    \item We have implemented \name and evaluated it with a number of benchmark programs with real-word vulnerabilities.
+  
 \end{itemize}
 
 
-
-This paper is organized as the following. 
-This work is structured as follows. In ~\autoref{sec:background}, we describe the mechanism behind kernel TOCTOU vulnerabilities. Give background information about this hardware feature SMAP. In ~\autoref{sec:design}, we describe our framework for run-time mitigation. How the light-weight hypervisor contains the SMAP feature on a particular process. In ~\autoref{sec:implementation}, we document some implementation details. In ~\autoref{sec:evaluation}, we test our mitigation with real-world vulnerabilities.  In ~\autoref{sec:discussion},  we discuss an alternative to solve the writing conflicts and methods of fuzzing. In ~\autoref{sec:relatedwork}, we discuss related works and conclude with ~\autoref{sec:conclusion}.
+\textbf{Roadmap}
+The rest of this paper is organized as the following. 
+In ~\autoref{sec:background}, we provide necessary background related to the mechanism behind kernel TOCTOU vulnerabilities and SMAP. ~\autoref{} describes the objectives, threat model and scope, challenges and architecture of \name. Next, we present how we perform run-time mitigation with SMAP and a light-weight hypervisor (~\autoref{}),  with implementation details ( ~\autoref{sec:implementation}), evaluation (~\autoref{sec:evaluation}), and tool() respectively.  In ~\autoref{sec:discussion},  we discuss an alternative to solve the writing conflicts and methods of fuzzing, followed by related work in ~\autoref{sec:relatedwork}, we discuss related works. Finally ~\autoref{sec:conclusion} concludes the paper.
