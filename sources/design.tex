@@ -29,11 +29,6 @@ In the meantime, putting the page into kernel space also protects it from other 
 \subsection{Page Privilege Transition} % transition or conversion? Or something else?
 
 
-%The memory management unit(MMU) in x86 architecture use page tables to map between virtual and physical pages~\cite{intelpaging}. Every page in the virtual memory has corresponding page table entries. As shown in~\autoref{fig:pte}, it contains bits that describes the page. For example, whether a page belongs to kernel or user depends on the 'User/Supervisor' bit. If the bit is set, then this page is a user page; if not, it's a kernel page. Obviously, user pages can be accessed by both user code and kernel code, but kernel pages can only be accessed by kernel code. 
-
-
-%To change a page's privilege, we need to find the corresponded \texttt{Page Table Entry (PTE)}.  In x86 architecture, the \texttt{Memory Management Unit (MMU)} uses page tables to map physical pages to virtual pages~\cite{intelpaging} so that each process in the system can have a flat virtual memory space. Every page in the virtual memory has an entry in the page table. As shown in~\autoref{fig:pte}, the \texttt{User/Supervisor} decides whether this is a kernel page or a user page. When set, it is a user page; otherwise, it is a kernel page.
-
 To change a page's privilege, we need to find the corresponded \texttt{Page Table Entry (PTE)}.  In x86 architecture, the \texttt{Memory Management Unit (MMU)} uses page tables to map physical pages to virtual pages~\cite{intelpaging} so that each process in the system can have a flat virtual memory space. Because even on a 32-bit system, mapping a virtual 4GB address takes a considerable amount of memory to store \texttt{PTEs}. Therefore the page table is a hierarchy structure to save memory. As shown in~\autoref{fig:pagetable}, the virtual address splits into three parts. The last 12-bit is the byte offset on the page, while the first two 10-bit are the index of the page table base (\texttt{CR3}) and \texttt{Page Directory (PD)}. The table is composed of 4KB pages. To save physical memory, swapping out page table page is also allowed. As shown in~\autoref{fig:pte}, the least significant bit being zero indicates this page is not present in the physical memory, which brings the following issue. 
 
 When we walk through the page table, it is inevitable to encounter an invalid page-table page, which was not a problem because the system will automatically bring it back by another page fault regarding page absence. However, this becomes a problem since we are already in the context of a \texttt{SMAP} page fault. The swapping process involves the system reading disk, which means more system calls. Due to the reasons mentioned above, system calls inevitably trigger more \texttt{SMAP} exceptions, which form a dead loop. Therefore, to solve this issue brings one of the necessities of developing a hypervisor-based solution to contain \texttt{SMAP} to the process level. 
@@ -57,9 +52,6 @@ Every page in the virtual memory has an entry in the page table. As shown in~\au
 \end{figure}
 
 
-%When handling a page fault exception, the faulting virtual address is always stored in the CR2 register and the root of the current process's page tables is stored in CR3 register. First we need to walk through the page table to locate the corresponding page table entry of the faulting address. Then to put a user page into kernel space, simply changes the 'U/S' bit to 0. It becomes a kernel page even thought it's address doesn't look so, because normally on x86 Windows system, the kernel space is above address 0x80000000. We also can change it back by doing the opposite with the 'U/S' bit. We do so when the current syscall ends.
-
-%When the page is in kernel space, it's protected from user code accesses, as shown in~\autoref{fig:denyuserwrite}.
 
 In the context of a page fault handler, the \texttt{CR2} register stores the faulting virtual address, which, regarding \texttt{SMAP}, is the user-mode address that the kernel accessed. The \texttt{CR3} register stores the physical address of the current page table base, with which we walk through the page table to locate the corresponded \texttt{PTE}. Additionally, we get the error code, \texttt{CS:EIP}, \texttt{SS:ESP} and \texttt{EFLAGS} from the  current kernel stack. Regarding \texttt{SMAP} exception, those are the context frame when the kernel raised the exception. Error code indicates the cause of the exception. We will discuss more details in~\autoref{sec:implementation}.
 
@@ -75,12 +67,8 @@ On Windows 32-bit system, we usually have the impression that the virtual addres
 \end{figure}
 
 
-%\subsubsection{Read Conflicts}
-%This is the base of our model. In reality, it's common that other user threads try to access data within the same page. For example, global variables or heap data when threads share the same heap pool. Even there are cases where read-only data is merged into one section with code by the compiler. We need to handle these situations as well.
-
-%To address this issue, user reading and user writing should be treated separately. Because reading doesn't change any data, it's safe to our mitigation. So when reading happens, we changes the page back to user space in order to fulfill the request. But we still want to remain its protection, because once we put it back, before another kernel access, this page is subject to any user access including writing. The solution is setting the page as read-only as well so subsequent writing triggers exception too. Certainly we record those information so when handling write violation we could behave accordingly and later restore the page attribute correctly. ~\autoref{fig:pagestate} shows the transitions due to different causes. 
-
 \textbf{\textit{Read Conflicts.}} It is common to have multiple global variables reside on, or multiple heap buffers share the same page. When we protect a 4KB page in the kernel space, we also block benign access to other data, especially when read by other user-mode threads will not do any harm. We solve the read conflict by taking the protected page back to userspace. Additionally, in the \texttt{PTE}, we also set \texttt{R/W} bit so that the page is read-only. ~\autoref{fig:pagestate} shows the transitions.
+
 
 \begin{figure}[th]
   \includegraphics[width=0.30\textwidth]{figures/pagestate}
@@ -90,12 +78,15 @@ On Windows 32-bit system, we usually have the impression that the virtual addres
 \end{figure}
 
 
-%Kernel reads/writes and user reads make the page transit from spaces and change attributes. The challenge remain is to handle user writes. 
-
 It is possible because when other user-mode threads read the protected page, it raises a page fault exception regarding privilege violation due to our protection. Therefore we can handle it and let the thread read the page safely. We will record the original page information to handle various situations and correctly restore it at the end of the system call. 
 
+
+
 \subsection{Handling Write Conflicts}
-Subject to the x86 architecture, the hardware mechanism works only on page granularity, meaning one page can't be partially protected. So our approach is the following. Since pages only need to be protected during the ongoing syscall, when a thread tries to write data during the time, we make the thread wait until the ongoing syscall ends. More specifically, the thread waits inside the page fault handler, giving up it's CPU time slice. 
+%Subject to the x86 architecture, the hardware mechanism works only on page granularity, meaning one page can't be partially protected. So our approach is the following. Since pages only need to be protected during the ongoing syscall, when a thread tries to write data during the time, we make the thread wait until the ongoing syscall ends. More specifically, the thread waits inside the page fault handler, giving up it's CPU time slice. 
+
+Unlike the read conflicts, we can not let the page be writable. Even the write on the rest of the data is benign. Subject to the x86 architecture, the protection has to base on page granularity. We make sure that no user-mode threads write the protect page during the system call, but they can write it after releasing the page. More specifically, once the write raises an exception, we suspend the thread until the current system call ends. We will discuss why it is possible to suspend a thread inside the page fault handler shortly after.
+
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/reexecute}
@@ -105,7 +96,9 @@ Subject to the x86 architecture, the hardware mechanism works only on page granu
 \end{figure}
 
 
-As shown in~\autoref{fig:reexecute}, thread 0 invoke a syscall. The kernel gets data from a user page, because of the mitigation, this page is protected. Then thread 1 tries to write it. It causes a page fault exception. From the error code our page fault handler is able to tell that this is a writing request, so it can't be granted. By calling a windows kernel function KeDelayExecutionTread(), the current thread gets into ``sleep''. After certain amount of time, it wakes up and checks if the page is released. If so, the page fault handler finish this exception and re-execute the faulting instruction. Otherwise, it sleeps again. A retry threshold is set in order to avoid deadlocks, for example, after ten tries, the thread will be terminated.  
+%As shown in~\autoref{fig:reexecute}, thread 0 invoke a syscall. The kernel gets data from a user page, because of the mitigation, this page is protected. Then thread 1 tries to write it. It causes a page fault exception. From the error code our page fault handler is able to tell that this is a writing request, so it can't be granted. By calling a windows kernel function KeDelayExecutionTread(), the current thread gets into ``sleep''. After certain amount of time, it wakes up and checks if the page is released. If so, the page fault handler finish this exception and re-execute the faulting instruction. Otherwise, it sleeps again. A retry threshold is set in order to avoid deadlocks, for example, after ten tries, the thread will be terminated.  
+
+As shown in ~\autoref{fig:reexecute}, thread 0 invokes a system call with parameters.  \name protects the corresponded page into kernel space once the kernel fetches those parameters. Afterward, thread 1 writes the page, which raises another page fault exception. Inside the handler, \name calls a kernel function, \texttt{KeDelayExecutionTread()}, that suspend the current thread. The thread wakes up periodically to check the page's status. If the page is released, it finishes the exception, re-executes the faulting instruction. Otherwise, \name terminates the thread to prevent any deadlock.
 
 \subsection{The Differences Between Interrupt and Exception}
 
