@@ -124,19 +124,13 @@ As mentioned above, we leverage the page attribute transition to protect and sol
 
 \subsection{Hypervisor}
 
-In the experiment, when we first enable SMAP in Windows system, exceptions flooded. Because Windows is not regulated itself as SMAP required, so every process, almost every syscall triggers SMAP page fault exception. And there is no easy way to simply discard them, even attached debugger is froze. To make it possible to just focus one case at a time, we figured a mechanism that can isolate SMAP inside a small range is necessary.
 
-Eventually we chose to use virtualization technology, a hypervisor, to isolate a CPU feature such as SMAP into particular processes. Even though hypervisor costs performance overhead, but in cloud computing environment nowadays, hypervisor is already in the settings.
+For \name, the hypervisor plays an essential role in developing and debugging. When we initially enabled \texttt{SMAP} in Windows, instantly, an enormous amount of exceptions flooded the system. The debugger was frozen.  We expected that because we know Windows does not support this feature, and \texttt{SMAP} is system-wide. Moreover, a significant portion of the system calls fetches user-provided parameters and important system data structures such as \texttt{Process Environment Block (PEB)}, \texttt{USER\_SHARED\_DATA} that mapped in userspace. 
 
-Hypervisor or virtual machine monitor(VMM) has several types. For example, native or bare-metal hypervisor, these hypervisors run directly on the host's hardware to control the hardware and to manage guest operating systems. Xen, Microsoft Hyper-V and VMware ESXi are this kind. Hosted hypervisor, these hypervisors run on a conventional operating system just as other programs do. VMware Workstation and QEMU are examples of this type.
+By monitoring the process context switch event, namely, operations on the \texttt{CR3} register, the hypervisor can temporarily enable/disable the \texttt{SMAP} feature to make it only active on a specific process.That is when this process is running on the CPU.
 
-But the one we use is none of these. It's a very simple runtime hypervisor. It doesn't emulate any hardware device but just monitors events of the system~\cite{howtohide}. Intel's virtualization technology makes it possible to transfer a running system from non-virtualization environment into the VMM guest mode. Our hypervisor is loaded as a Windows kernel driver at runtime. It sets up and enters virtualization, lifts the running OS into guest mode, and itself becomes the hypervisor.  
+Due to Intel VT virtualization technology's design~\cite{neiger2006intel}, it is possible to load a light-weight hypervisor as a kernel module during run time. Unlike other commercial hypervisors such as Xen, Hyper-V, and VMWare, it does not emulate hardware devices. It merely put the operating system into VM guest mode, and itself becomes the hypervisor, hence monitors system events~\cite{howtohide}.
 
-Also based on efficiency considerations, page fault handling is a highly optimized component. It's meaningful to reduce exceptions that being introduced by SMAP. As mentioned earlier, not all processes in the system need to be monitored. So the hypervisor framework is also one contribution of this paper. 
-
-SMAP is enabled when the SMAP bit in the CR4 is set. So the idea is to set it during the particular process. In x86 architecture, VMM provides virtual memory space for every process and each process may have multiple threads that share the same virtual memory space. Each process has a set of page tables that maps virtual pages to physical pages. So the root of the page table is stored in CR3. Every time a process switches in or out, the CR3 will be set correspondingly.
-
-Fortunately, Intel's virtualization technology allows us to capture that event. Operation on control registers cause the virtual machine (VM, the OS in guest mode in this case)to exit to the root mode(hypervisor). For example, ``MOV CR3, EAX'' is a typical instruction when setting the CR3, where EAX has the new page table root. Every time when the system does that, our hypervisor gets a chance to get involved.
 
 \begin{figure}[th]
   \includegraphics[width=0.40\textwidth]{figures/processmap3}
@@ -145,5 +139,7 @@ Fortunately, Intel's virtualization technology allows us to capture that event. 
   \label{fig:processmap}
 \end{figure}
 
-Suppose we focus on one particular process, as shown in~\autoref{fig:processmap}, when VM exits, compares the new CR3 with the our targeted one, if they match, we will set the SMAP bit in the CR4 field of the virtual machine control structure(VMCS) of the VM. This is the structure which is used to update the real hardware registers when re-entering the virtual machine. Therefore, when the VM resumes, the processor's CR4 will be updated. Because this is the current process that is running, it will feel that SMAP is enabled. When this process switches out, we clears SMAP bit. So SMAP will be disable for other processes.
 
+As shown in~\autoref{fig:processmap}, \texttt{mov cr3, eax} triggers a \texttt{VM Exit} event, and the hypervisor receives it. If the new \texttt{CR3} is one of the target processes, the hypervisor sets the \texttt{CR4.SMAP} in the \texttt{Virtual Machine Control Structure (VMCS)} of the guest virtual machine. It is the data structure that updates the real CPU registers when entering the virtual machine. Back to the guest, the \texttt{SMAP} is active while the process is running. When this process is switching out, the hypervisor again receives the event regarding \texttt{CR3} operation. It then unset \texttt{CR4.SMAP}. Therefore, this particular process will have the illusion that \texttt{SMAP} is active continually while others feel the opposite.
+
+The hypervisor inevitably brings performance overhead. However, it makes the mitigation more configurable. Due to the nature of local privilege escalation attacks, system processes already with high privilege are not likely threats. Hence no protection on them, which reduces the overall overhead.  Additionally, as previously mentioned, to prevent \texttt{SMAP} recurring cased dead loop, the feature isolation is also necessary. Therefore we consider the hypervisor framework as one contribution of this paper.
