@@ -3,21 +3,12 @@
 \section{\name}
 \label{sec:design}
 
-In this section, we present the design of our project. It has two major parts, the main module setups SMAP environment, monitors kernel to user space accesses, intercepts and handles related page faults and makes the page attributes transitioning. The other part is the hypervisor. As briefly mentioned in the introduction, the hypervisor in charges of isolating the SMAP feature to certain processes.
+In this section, we present the design of our project. It has two major parts, the \textbf{system module} setups SMAP environment, monitors kernel to user space accesses, intercepts and handles related page faults and makes the page attributes transitioning. The other part is the \textbf{hypervisor}. As briefly mentioned in the introduction, the hypervisor in charges of isolating the SMAP feature to certain processes.
 
-\subsection{Monitoring Kernel to Userspace Access}
 
-%This is the major issue we faced when addressing kernel TOCTOU vulnerability. Reading and writing memory is the most common operation that a computer system does. So even with virtualization technology, there is no trap event on accessing memory. However, what makes the kernel TOCTOU vulnerability special is the fact that it's always the case that the kernel accesses user space. So we employ SMAP to monitor such behavior. 
+\subsection{System Module}
 
-%Because there is no reasons for the user parameters to change during the ongoing syscall, we should make them unchangeable. For now, due to the practical reason that SMAP works on page granularity, we protect all the pages that contain the user parameters from being tampered with. Conflicts caused by this will be solved later in this section.
-
-%As mentioned earlier, once SMAP enabled, kernel accessing user space triggers page fault exceptions, so we intercepts OS's page fault handler. But the handler needs to handle all the exceptions in the system, it's a efficiency critical component. So the first thing we need to do is to distinguish the ones that caused by SMAP or by our subsequent protection. Notice that SMAP is a very strict rule. For example, in Linux system, the two user-data-access functions \texttt{copy\_to\_user()} and \texttt{copy\_from\_user()} temporarily disable SMAP right before accessing user space and re-enable it right after. That means the system should not seen any SMAP caused exception. Once there is one, the Linux kernel will take it as a serious error, then panic. The same with Windows, it didn't support SMAP yet, it also crashes when sees such exceptions.
-
-%Even though Intel provides two new instructions CLAC/STAC to temporarily disable/enable the feature, in page fault handler, it's already too late to cancel it.
-
-%Now we have a efficient hardware mechanism that can inform us whenever there is a kernel-to-user access. The rest is to protect the pages and to let the system continue. We choose to put the faulting page into the kernel space by setting the attributes in theirs page table entries(PTE). By doing so, the page fault exception is handled because it's no longer kernel accessing a user page, also the faulting page is protected from other user threads. 
-
-As previously mentioned, the biggest challenge we meet is how to monitor kernel-to-userspace behavior efficiently because reading memory is such an ordinary CPU operation that no mechanism is available for monitoring a broad range of memory. Since \texttt{SMAP} accurately serves the purpose, we want to leverage it in a novel way, not for what it initially designed.
+\textbf{\textit{Monitoring Kernel to Userspace Access.}} As previously mentioned, the biggest challenge we meet is how to monitor kernel-to-userspace behavior efficiently because reading memory is such an ordinary CPU operation that no mechanism is available for monitoring a broad range of memory. Since \texttt{SMAP} accurately serves the purpose, we want to leverage it in a novel way, not for what it initially designed.
 
 
 In an ideal situation, the hardware should report each kernel-to-userspace access and locks user memory at word granularity until we choose to cancel it. Because in a service-client model, the user program should provide stationary parameters. However, \texttt{SMAP} only provides page granularity, and the exception that raised is fatal because, from its original intent, the operating system should crash when it receives such an exception.
@@ -26,10 +17,10 @@ We respond to the challenge with a novel method of recovering from the exception
 
 In the meantime, putting the page into kernel space also protects it from other user-mode threads, which is what we need to prevent the race condition on the variable between the kernel and user program. However, the entire page's protection may block other legit read and write operations on the rest of the data. We will discuss the conflicts caused by this later in the section.
 
-\subsection{Page Privilege Transition} % transition or conversion? Or something else?
+%\subsection{Page Privilege Transition} % transition or conversion? Or something else?
 
 
-To change a page's privilege, we need to find the corresponded \texttt{Page Table Entry (PTE)}.  In x86 architecture, the \texttt{Memory Management Unit (MMU)} uses page tables to map physical pages to virtual pages~\cite{intelpaging} so that each process in the system can have a flat virtual memory space. Because even on a 32-bit system, mapping a virtual 4GB address takes a considerable amount of memory to store \texttt{PTEs}. Therefore the page table is a hierarchy structure to save memory. As shown in~\autoref{fig:pagetable}, the virtual address splits into three parts. The last 12-bit is the byte offset on the page, while the first two 10-bit are the index of the page table base (\texttt{CR3}) and \texttt{Page Directory (PD)}. The table is composed of 4KB pages. To save physical memory, swapping out page table page is also allowed. As shown in~\autoref{fig:pte}, the least significant bit being zero indicates this page is not present in the physical memory, which brings the following issue. 
+\textbf{\textit{Page Privilege Transition.}} To change a page's privilege, we need to find the corresponded \texttt{Page Table Entry (PTE)}.  In x86 architecture, the \texttt{Memory Management Unit (MMU)} uses page tables to map physical pages to virtual pages~\cite{intelpaging} so that each process in the system can have a flat virtual memory space. Because even on a 32-bit system, mapping a virtual 4GB address takes a considerable amount of memory to store \texttt{PTEs}. Therefore the page table is a hierarchy structure to save memory. As shown in~\autoref{fig:pagetable}, the virtual address splits into three parts. The last 12-bit is the byte offset on the page, while the first two 10-bit are the index of the page table base (\texttt{CR3}) and \texttt{Page Directory (PD)}. The table is composed of 4KB pages. To save physical memory, swapping out page table page is also allowed. As shown in~\autoref{fig:pte}, the least significant bit being zero indicates this page is not present in the physical memory, which brings the following issue. 
 
 When we walk through the page table, it is inevitable to encounter an invalid page-table page, which was not a problem because the system will automatically bring it back by another page fault regarding page absence. However, this becomes a problem since we are already in the context of a \texttt{SMAP} page fault. The swapping process involves the system reading disk, which means more system calls. Due to the reasons mentioned above, system calls inevitably trigger more \texttt{SMAP} exceptions, which form a dead loop. Therefore, to solve this issue brings one of the necessities of developing a hypervisor-based solution to contain \texttt{SMAP} to the process level. 
 
@@ -60,7 +51,7 @@ On Windows 32-bit system, we usually have the impression that the virtual addres
 
 
 \begin{figure}[th]
-  \includegraphics[width=0.30\textwidth]{figures/denyuserwrite}
+  \includegraphics[width=0.37\textwidth]{figures/denyuserwrite}
   \centering
   \caption{User-mode thread 0 initiates a system call with parameters. The system call, which runs in the kernel, access the user-mode memory to get the value. This action raises a SMAP exception and entry the exception handler, within which our mitigation changes the page from user-mode to kernel-mode. Therefore it blocks subsequent accesses from other user-mode threads.}
   \label{fig:denyuserwrite}
@@ -82,10 +73,10 @@ It is possible because when other user-mode threads read the protected page, it 
 
 
 
-\subsection{Handling Write Conflicts}
+%\subsection{Handling Write Conflicts}
 %Subject to the x86 architecture, the hardware mechanism works only on page granularity, meaning one page can't be partially protected. So our approach is the following. Since pages only need to be protected during the ongoing syscall, when a thread tries to write data during the time, we make the thread wait until the ongoing syscall ends. More specifically, the thread waits inside the page fault handler, giving up it's CPU time slice. 
 
-Unlike the read conflicts, we can not let the page be writable. Even the write on the rest of the data is benign. Subject to the x86 architecture, the protection has to base on page granularity. We make sure that no user-mode threads write the protect page during the system call, but they can write it after releasing the page. More specifically, once the write raises an exception, we suspend the thread until the current system call ends. We will discuss why it is possible to suspend a thread inside the page fault handler shortly after.
+\textbf{\textit{Write Conflicts.}} Unlike the read conflicts, we can not let the page be writable. Even the write on the rest of the data is benign. Subject to the x86 architecture, the protection has to base on page granularity. We make sure that no user-mode threads write the protect page during the system call, but they can write it after releasing the page. More specifically, once the write raises an exception, we suspend the thread until the current system call ends. We will discuss why it is possible to suspend a thread inside the page fault handler shortly after.
 
 
 \begin{figure}[th]
@@ -96,24 +87,20 @@ Unlike the read conflicts, we can not let the page be writable. Even the write o
 \end{figure}
 
 
-%As shown in~\autoref{fig:reexecute}, thread 0 invoke a syscall. The kernel gets data from a user page, because of the mitigation, this page is protected. Then thread 1 tries to write it. It causes a page fault exception. From the error code our page fault handler is able to tell that this is a writing request, so it can't be granted. By calling a windows kernel function KeDelayExecutionTread(), the current thread gets into ``sleep''. After certain amount of time, it wakes up and checks if the page is released. If so, the page fault handler finish this exception and re-execute the faulting instruction. Otherwise, it sleeps again. A retry threshold is set in order to avoid deadlocks, for example, after ten tries, the thread will be terminated.  
-
 As shown in ~\autoref{fig:reexecute}, thread 0 invokes a system call with parameters.  \name protects the corresponded page into kernel space once the kernel fetches those parameters. Afterward, thread 1 writes the page, which raises another page fault exception. Inside the handler, \name calls a kernel function, \texttt{KeDelayExecutionTread()}, that suspend the current thread. The thread wakes up periodically to check the page's status. If the page is released, it finishes the exception, re-executes the faulting instruction. Otherwise, \name terminates the thread to prevent any deadlock.
 
-\subsection{The Differences Between Interrupt and Exception}
-
-Sleeping inside the page fault handler sounds strange. To explain it, I should briefly talk about what are exception and interruption and what's the difference.
-
-Interrupt is a signal emitted by a peripheral hardware device such as network card, telling CPU that the device needs immediate attention. It's also called external interrupt or hardware interrupt(There is also software interrupt, but not discussed here). They have higher priority than the OS's scheduler and even higher than most of the kernel components. It's not suitable to put time consuming job in the interrupt handler. Any job that takes too long may even trigger the watchdog crash~\cite{msdnwatchdog}.   
-
-On the other hand, exception is generated internally by the CPU, informing the OS to handle an event or an error, such as double fault, page fault, general protection fault and etc. In x86 architecture, external interrupts and exceptions are all handled through the Interrupt Descriptor Table (IDT), they all part of the kernel code. But unlike external interrupt, exception's priority is the same level with the OS scheduler. In Windows system's terminology, the Interrupt Request Level (IRQL) stays at \texttt{PASSIVE\_LEVEL} which also is the level where user program runs. So it's possible to safely call Windows kernel function KeDelayExecutionThread(), which has similar effect as a user program calls sleep(). 
+%\subsection{The Differences Between Interrupt and Exception}
 
 
-\subsection{Releasing Protected Pages}
 
-Whenever a syscall ends, all the protected page that related to it should be released. Their original attributes will be restored. The Thread Environment Block(TEB) is used to identify each thread within the current process. Each thread has its own TEB data and it's address is easy to locate by segment register FS. 
+\textbf{\textit{Interrupt and Exception.}} Thread suspending inside the page fault handler seems unusual because both interrupts and exceptions have their handler entries in the \texttt{Interrupt Descriptor Table (IDT)}. However, the difference between them is essential.  An interrupt is an asynchronous event that is typically triggered by an I/O device. An exception is a synchronous event generated when the processor detects one or more predefined conditions while executing an instruction. Interrupts have a higher priority than the operating system's scheduler and most of the kernel components. Any job should not take too long inside the interrupt handler~\cite{msdnwatchdog}.  On the contrary, exceptions have the lowest priority in the kernel. In Windows' term, the \texttt{ Interrupt Request Level (IRQL)} that the exception handler executes at is \texttt{PASSIVE\_LEVEL}. It means to call for thread scheduling is plausible.
 
-We hook a Windows internal function in order to know when it's the end of the syscall. 
+
+%\subsection{Releasing Protected Pages}
+
+%Whenever a syscall ends, all the protected page that related to it should be released. Their original attributes will be restored. The Thread Environment Block(TEB) is used to identify each thread within the current process. Each thread has its own TEB data and it's address is easy to locate by segment register FS. 
+
+%We hook a Windows internal function in order to know when it's the end of the syscall. 
 
 %\begin{comment}
 %\begin{figure}[th]
@@ -124,13 +111,16 @@ We hook a Windows internal function in order to know when it's the end of the sy
 %\end{figure}
 %\end{comment}
 
+\textbf{\textit{Release Protected Pages.}} To aware when a system call ends, we choose to intercept a Windows internal function. We keep tracking the page table base and \texttt{Thread Environment Block (TEB)} to distinguish each thread so that we release the involved pages on the system call basis.  
 
 
-\subsection{TLB Caching}
+%\subsection{TLB Caching}
 
-Translation lookaside buffer(TLB) is a memory cache that is used to accelerate the process of paging. Each CPU core has it's own set of TLB. It has a fixed number of slots containing page table entries. Because accessing cache is much faster than accessing memory. When cache contains the page table entries needed, the CPU don't have to walk through the page table.
+\textbf{\textit{Flush TLB.}} Translation Lookaside Buffer (TLB) is a memory cache used to reduce the time taken to access a virtual memory location. It stores the recent translations of virtual memory to physical memory. Different than data cache, TLB is not entirely transparent to the operating system. When the operating system updates a page table entry, the corresponding TLB entry needs to be invalidated.  
 
-Since the page protection is based on page attribute transition, every time we make changes to page table entries, we also need to update TLB on all the CPU cores in order to reflect the changes. 
+As mentioned above, we leverage the page attribute transition to protect and solve conflicts. They are all based on the \texttt{PTE} modification. Hence it is critical to ensure the change on \texttt{PTE} takes effects instantly, especially on a multi-processor system. We examine the method to flush the \texttt{TLB} on the multi-process system through programming the local \texttt{Advanced Programmable Interrupt Controller (APIC)}. Eventually, we find a Windows internal function that flushes \texttt{TLB} entries on all the processors with some reverse-engineering effort. Therefore we do not have to consider the underlying hardware differences.
+
+
 
 \subsection{Hypervisor}
 
