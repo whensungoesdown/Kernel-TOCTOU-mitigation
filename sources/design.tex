@@ -10,9 +10,7 @@ In this section, we present the design of our project. It has two major parts, t
 
 \textbf{\textit{Monitoring Kernel to Userspace Access.}} The biggest challenge we meet is how to monitor kernel-to-userspace behavior efficiently. Read memory is such an ordinary CPU operation so that no mechanism is available for monitoring a broad range of memory. Since \texttt{SMAP} accurately serves the purpose, we want to leverage it in a novel way, not for what it initially designed.
 
-However, not every aspect of the \texttt{SMAP} is a perfect fit. In an ideal situation, the hardware should report each kernel-to-userspace access and locks user memory at word granularity until we choose to cancel it.  However, \texttt{SMAP} only provides page granularity. 
-
-Moreover, the \texttt{SMAP} exception is fatal to the system. From its original intent, the operating system should crash when it receives such an exception.
+However, not every aspect of the \texttt{SMAP} is a perfect fit. In an ideal situation, the hardware should report each kernel-to-userspace access and locks user memory at word granularity until we choose to cancel it.  However, \texttt{SMAP} only provides page granularity. Moreover, the \texttt{SMAP} exception is fatal to the system. From its original intent, the operating system should crash when it receives such an exception.
 
 
 
@@ -129,7 +127,6 @@ As mentioned above, we leverage the page attribute transition to protect and sol
 
 For \name, the hypervisor plays an essential role in developing and debugging. When we initially enabled \texttt{SMAP} in Windows, instantly, an enormous amount of exceptions flooded the system. The debugger was frozen.  We expected that because we know Windows does not support this feature, and \texttt{SMAP} is system-wide. Moreover, a significant portion of the system calls fetches user-provided parameters and important system data structures such as \texttt{Process Environment Block (PEB)}, \texttt{USER\_SHARED\_DATA} that mapped in userspace. 
 
-By monitoring the process context switch event, namely, operations on the \texttt{CR3} register, the hypervisor can temporarily enable/disable the \texttt{SMAP} feature to make it only active on a specific process. That is when this process is running on the CPU.
 
 Due to Intel VT virtualization technology's design~\cite{neiger2006intel}, it is possible to load a light-weight hypervisor as a kernel module during run time. Unlike other commercial hypervisors such as Xen, Hyper-V, and VMWare, it does not emulate hardware devices. It merely put the operating system into VM guest mode, and itself becomes the hypervisor, hence monitors system events~\cite{howtohide}.
 
@@ -142,6 +139,6 @@ Due to Intel VT virtualization technology's design~\cite{neiger2006intel}, it is
 \end{figure}
 
 
-As shown in~\autoref{fig:processmap}, \texttt{mov cr3, eax} triggers a \texttt{VM Exit} event, and the hypervisor receives it. If the new \texttt{CR3} is one of the target processes, the hypervisor sets the \texttt{CR4.SMAP} in the \texttt{Virtual Machine Control Structure (VMCS)} of the guest virtual machine. It is the data structure that updates the real CPU registers when entering the virtual machine. Back to the guest, the \texttt{SMAP} is active while the process is running. When this process is switching out, the hypervisor again receives the event regarding \texttt{CR3} operation. It then unset \texttt{CR4.SMAP}. Therefore, this particular process will have the illusion that \texttt{SMAP} is active continually while others feel the opposite.
+By monitoring the process context switch event, namely, operations on the \texttt{CR3} register, the hypervisor can temporarily enable/disable the \texttt{SMAP} feature to make it only active on a specific process. That is when this process is running on the CPU. As shown in~\autoref{fig:processmap}, \texttt{mov cr3, eax} triggers a \texttt{VM Exit} event, and the hypervisor receives it. If the new \texttt{CR3} is one of the target processes, the hypervisor sets the \texttt{CR4.SMAP} in the \texttt{Virtual Machine Control Structure (VMCS)} of the guest virtual machine. It is the data structure that updates the real CPU registers when entering the virtual machine. Back to the guest, the \texttt{SMAP} is active while the process is running. When this process is switching out, the hypervisor again receives the event regarding \texttt{CR3} operation. It then unset \texttt{CR4.SMAP}. Therefore, this particular process will have the illusion that \texttt{SMAP} is active continually while others feel the opposite.
 
 The hypervisor inevitably brings performance overhead. However, it makes the mitigation more configurable. Due to the nature of local privilege escalation attacks, system processes already with high privilege are not likely threats. Hence no protection on them, which reduces the overall overhead.  Additionally, as previously mentioned, to prevent \texttt{SMAP} recurring cased dead loop, the feature isolation is also necessary. Therefore we consider the hypervisor framework as one contribution of this paper.

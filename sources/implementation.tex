@@ -5,44 +5,32 @@
 \section{Implementation}
 \label{sec:implementation}
 
-In this section, we give some implementation details and issues that we had during development.
-
-\subsection{Hypervisor}
-
-
-There are two new modes to run under virtualization: VMX root operation and VMX non-root operation. VMX stands for virtual machine extension. It proves new instructions VMXON, VMXOFF, VMPTRLD, VMPTRST, VMCLEAR, VMREAD, VMWRITE, VMCALL, VMLAUNCH, VMRESUME.
-
-Usually processor has running mode known as ring-0 to ring-3, where ring-0 is kernel mode, ring-3 is user mode, ring 1 and ring 2 are rarely used. When CPU enables virtualization, it could be seen as running in the non-root mode. The root mode can be considered as a lower and more privileged level, it controls the whole CPU. And the guest operating system will run in non-root mode. Root mode runs VMM (Virtual Machine Monitor) is often called ring -1.
-
-VMXON and VMXOFF are instructions to enter and exit VMX mode. There is an important data structure called VMCS (Virtual-Machine Control Structure), which is 4 KB large in size. It controls the state switch between VMX root mode and VMX non-root mode. From root mode to non-root mode called VM Exit. From non-root mode to root mode called VM Enter.
-
-Every logical CPU (each core in a real physical CPU is called a logical CPU) has a processor state called VMCS pointer. It contains the physical address of the VMCS. There could be many VMCSs, the one stored in VMCS pointer is considered as the current one. Every VMCS can represent a virtual processor for the virtual machine, inside virtual machine, that is a logical CPU seen by operating system. Although hypervisor knows the physical address of a VMCS, but hypervisor cannot modify it directly, hypervisor can only reads and writes VMCS using VMREAD, VMWRITE instructions. Hypervisor use VMPTRLD to set a VMCS both as active and current. And use VMCLEAR to mark the VMCS as inactive.
-
-A VMCS contains many fields related every aspect of a virtual machine. There are six fields: Guest-state area, Host-state area, VM-execution control fields, VM-exit control fields, VM-entry control fields and VM-exit information fields. And each field also contains many more control fields with a lot of settings. Once the CPU enters into a virtual machine by execute VMLAUNCH which associates with a VMCS, this virtual machine is fully control by the settings in the VMCS. For example, the CR4 field in the Guest-state area is the one we used to update the actual CPU register.  Hypervisor can set during what circumstances the virtual machine should exit. And then the hypervisor can handle this situation, for example emulate a hardware device or change the virtual machine's behavior. In this case, it's the control register related operations that we are interested. 
-
-We do not actually emulate any hardware device, we put the current system into a virtual machine environment and our code run as the hypervisor.
+This section provides the implementation details and discusses the issues that we encountered during the development.
 
 
 
 \subsection{Page Faults}
-Handling exceptions is the major part of this mitigation. The type we need to handle is page fault exception. They may be caused directly by SMAP or by our protection on the pages. Even though it's called ``page fault'', but not all exceptions are due to program errors. For example, page fault is one part of paging mechanism in x86 architecture to make the virtual memory much larger then the physical memory that exists in the system. 
 
-We need to handle all the page fault exceptions before the system's handler does. Some of the them need to be passed to the operating system, for example, those invalid pages. And the others need to be intercepted. There is a 32-bit error code being pushed into the kernel stack when exception triggered, as shown in~\autoref{fig:pagefaulterrorcode}.
 
+Exception handling is the primary method of \name. We leverage \texttt{SMAP} exception to notify the kernel-to-userspace access and next use exception to solve the read and write conflicts. Those events are all categorized as page faults. A page fault is a type of exception raised by the CPU when accessing a virtual page. The page ``fault'' mostly is not an error. It is the CPU's mechanism to implement virtual memory. For example, a page absence page fault is recoverable once the system assigns the physical page back.
+
+We need to handle page fault exceptions before the system does.
+Because the page fault caused by \texttt{SMAP} is fatal. It is not recoverable by design. Additionally, the followed exceptions that are related to the protection should not handle by the system either. We must also be careful with the exception that should send to the system, such as page absence. Because if we accidentally process those, it may cause system malfunctioning. To identify the cause of a page fault is not easy.  When page fault happens, the CPU pushes a 32-bit error code into the kernel stack with the format shown in~\autoref{fig:pagefaulterrorcode}.  Unfortunately, there is no exact error code regarding \texttt{SMAP}.  Still we can decide from the values in the kernel stack such as \texttt{CS:EIP}, \texttt{SS:ESP}, \texttt{EFLAGS} and the value from \texttt{CR2} and \texttt{CR3}.
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/pagefaulterrorcode}
   \centering
-  \caption{Page Fault Error Code.~\cite{intelinterrupt} Unfortunately, SMAP doesn't have a separate bit. The exception it triggers comes with U/S bit set to 0, but the reason for that is not unique.}
+  \caption{Page Fault Error Code.~\cite{intelinterrupt} Notice, there is no exact error code regarding \texttt{SMAP}. In the context of an \texttt{SMAP} exception, the \texttt{U/S} bit is zero, which indicates kernel-mode access. We still need to combine this information with the faulting address and \texttt{CS} segment register to confirm the cause.}
   \label{fig:pagefaulterrorcode}
 \end{figure}
 
-The bits do not clearly indicate the cause. For example, there is no ``SMAP'' bit. So our page fault handler needs to collect more information in order to tell the possible reason for the exception. Register values of EIP, CS, ESP, SS, EFLAGS are also pushed into the kernel stack with the error code. We also get the page table root from CR3 and the faulting virtual address from CR2.
 
-First, We need to screen out some of the cases that are irrelevant. For example, When exceptions come in with ``P'' bit unset, indicating that the page is not present in the memory. It's part of the paging mechanism, pages can be swapped out to secondary storage such as hard disk. Even our page fault handler itself may trigger this type of page faults. Since page tables are reside in the page-able pages, so when we walk through the page table, some of the PTE pages may not be there. Therefore we need to pass such page faults to operating system as soon as possible, otherwise it will cause a dead loop inside our handler. We also observe that there is no exception caused both by non-present page and SMAP at the same time, so it's safe to do so.
 
-After screen out unrelated exceptions, the algorithm that handles mitigation related exceptions is shown in Algorithm~\ref{algo:pagefaulthandler}.
+We need to filter out the irrelevant exceptions first. For example, \texttt{P:0} in the error code indicates the page absence, and we must pass it to the original page fault handler without any modification. We have not observed a \texttt{SMAP} exception on the invalid page, even though the error code may have combined bits. Other than that, \texttt{U/S:1} shows it is user-mode access, which will not cause \texttt{SMAP} exception.  The \texttt{Current Privilege Level (CPL)} in the \texttt{cs} segment register also reveals the context. Additionally, we keep track of the protected or relevant pages, which helps to identify the exceptions.
 
+
+
+After filtering, ~\autoref{algo:pagefaulthandler} shows the basic algorithm to handle the \texttt{SMAP} and related exceptions.
 
 
 \begin{algorithm}[ht]
@@ -59,7 +47,7 @@ After screen out unrelated exceptions, the algorithm that handles mitigation rel
     	\State \Call{\textbf{SetPageKernel}}{pte}
     	\State \Call{\textbf{FlashTlb}}{address}
     	\State \Return{Re-execute}
-\ElsIf{UserAaccessProtectedPage}
+\ElsIf{UserAccessProtectedPage}
 	\If{error.WRITE}
     		\Repeat 
 		\State \Call{\textbf{Sleep}}{}
@@ -90,7 +78,23 @@ After screen out unrelated exceptions, the algorithm that handles mitigation rel
 
 
 
-Another technical detail we should mention is that when entering page fault handler, interrupts are tuned off automatically. This is because exception is raised through an ``interrupt gate''. The CPU clears the IF(Interrupt enable flag) in the EFLAGS register and sets it back when interrupts return. In our case, after getting the faulting virtual address from CR2, we immediately set the IF flag by executing instruction STI in order to let the processor being able to receive nested exceptions.
+\textbf{\textit{Enable Interrut.}} The page fault exception is called through an \texttt{Interrupt Gate}~\cite{intelinterrupt}. Therefore, when entering the page fault handler, the CPU clears \texttt{EFLAGS:IF} automatically prevents subsequent interrupts from interfering with the handler's execution. Since we need to walk through the page table, it may access an invalid page, which triggers a nested page fault exception to bring the page back from disk. Therefore we need to set \texttt{EFLAGS:IF} before the page table walk.
+
+\subsection{Hypervisor}
+
+
+There are two new modes to run under virtualization: VMX root operation and VMX non-root operation. VMX stands for virtual machine extension. It proves new instructions VMXON, VMXOFF, VMPTRLD, VMPTRST, VMCLEAR, VMREAD, VMWRITE, VMCALL, VMLAUNCH, VMRESUME.
+
+Usually processor has running mode known as ring-0 to ring-3, where ring-0 is kernel mode, ring-3 is user mode, ring 1 and ring 2 are rarely used. When CPU enables virtualization, it could be seen as running in the non-root mode. The root mode can be considered as a lower and more privileged level, it controls the whole CPU. And the guest operating system will run in non-root mode. Root mode runs VMM (Virtual Machine Monitor) is often called ring -1.
+
+VMXON and VMXOFF are instructions to enter and exit VMX mode. There is an important data structure called VMCS (Virtual-Machine Control Structure), which is 4 KB large in size. It controls the state switch between VMX root mode and VMX non-root mode. From root mode to non-root mode called VM Exit. From non-root mode to root mode called VM Enter.
+
+Every logical CPU (each core in a real physical CPU is called a logical CPU) has a processor state called VMCS pointer. It contains the physical address of the VMCS. There could be many VMCSs, the one stored in VMCS pointer is considered as the current one. Every VMCS can represent a virtual processor for the virtual machine, inside virtual machine, that is a logical CPU seen by operating system. Although hypervisor knows the physical address of a VMCS, but hypervisor cannot modify it directly, hypervisor can only reads and writes VMCS using VMREAD, VMWRITE instructions. Hypervisor use VMPTRLD to set a VMCS both as active and current. And use VMCLEAR to mark the VMCS as inactive.
+
+A VMCS contains many fields related every aspect of a virtual machine. There are six fields: Guest-state area, Host-state area, VM-execution control fields, VM-exit control fields, VM-entry control fields and VM-exit information fields. And each field also contains many more control fields with a lot of settings. Once the CPU enters into a virtual machine by execute VMLAUNCH which associates with a VMCS, this virtual machine is fully control by the settings in the VMCS. For example, the CR4 field in the Guest-state area is the one we used to update the actual CPU register.  Hypervisor can set during what circumstances the virtual machine should exit. And then the hypervisor can handle this situation, for example emulate a hardware device or change the virtual machine's behavior. In this case, it's the control register related operations that we are interested. 
+
+We do not actually emulate any hardware device, we put the current system into a virtual machine environment and our code run as the hypervisor.
+
 
 \subsection{Updating PTE}
 
