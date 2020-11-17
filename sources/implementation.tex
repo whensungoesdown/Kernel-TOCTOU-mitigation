@@ -83,15 +83,6 @@ After filtering, ~\autoref{algo:pagefaulthandler} shows the basic algorithm to h
 \subsection{Hypervisor}
 
 
-%There are two new modes to run under virtualization: VMX root operation and VMX non-root operation. VMX stands for virtual machine extension. It proves new instructions VMXON, VMXOFF, VMPTRLD, VMPTRST, VMCLEAR, VMREAD, VMWRITE, VMCALL, VMLAUNCH, VMRESUME.
-
-%Usually processor has running mode known as ring-0 to ring-3, where ring-0 is kernel mode, ring-3 is user mode, ring 1 and ring 2 are rarely used. When CPU enables virtualization, it could be seen as running in the non-root mode. The root mode can be considered as a lower and more privileged level, it controls the whole CPU. And the guest operating system will run in non-root mode. Root mode runs VMM (Virtual Machine Monitor) is often called ring -1.
-
-%VMXON and VMXOFF are instructions to enter and exit VMX mode. There is an important data structure called VMCS (Virtual-Machine Control Structure), which is 4 KB large in size. It controls the state switch between VMX root mode and VMX non-root mode. From root mode to non-root mode called VM Exit. From non-root mode to root mode called VM Enter.
-
-%Every logical CPU (each core in a real physical CPU is called a logical CPU) has a processor state called VMCS pointer. It contains the physical address of the VMCS. There could be many VMCSs, the one stored in VMCS pointer is considered as the current one. Every VMCS can represent a virtual processor for the virtual machine, inside virtual machine, that is a logical CPU seen by operating system. Although hypervisor knows the physical address of a VMCS, but hypervisor cannot modify it directly, hypervisor can only reads and writes VMCS using VMREAD, VMWRITE instructions. Hypervisor use VMPTRLD to set a VMCS both as active and current. And use VMCLEAR to mark the VMCS as inactive.
-
-
 Intel \texttt{Virtual-Machine Extensions (VMX)} provides hardware-assistant virtualization, which adds 13 new instructions: \texttt{VMPTRLD}, \texttt{VMPTRST}, \texttt{VMCLEAR}, \texttt{VMREAD}, \texttt{VMWRITE}, \texttt{VMCALL}, \texttt{VMLAUNCH}, \texttt{VMRESUME}, \texttt{VMXOFF}, \texttt{VMXON}, \texttt{INVEPT}, \texttt{INVVPID}, and \texttt{VMFUNC}. \texttt{VMX} supports two modes, namely root and non-root mode, where in root mode runs the hypervisor, and virtual machines or called guest runs in non-root mode. On x86 architecture, the CPU has 4 protection rings, wherethe kernel runs at \texttt{ring 0}, the highest priority ring, and the user programs runs at \texttt{ring 3}, while the other two rings are not used. With VMX, the root model is often viewed as the \texttt{ring -1}. \texttt{VMXON}/\texttt{VMXOFF} enters/exits \texttt{VMX} mode. The \texttt{Virtual Machine Control Structure (VMCS)} is the most important data structure, which stores the data and state of one virtual CPU for one virtual machine. Each core in a physical CPU has a \texttt{VMCS} pointer. It points to the physical address of one \texttt{VMCS}. \texttt{VMPTRLD} loads the \texttt{VMCS} pointer from physical memory and makes it active and current. On contrary, \texttt{VMCLEAR} stores \texttt{VMCS} active states back to memory and makes it inactive. Although hypservisor fully aware the physical address of each \texttt{VMCS} but it can not modify them directly. All the operationgs on \texttt{VMCS} should go through instruction \texttt{VMREAD} and \texttt{VMWRITE}.
 
 
@@ -102,11 +93,8 @@ The \texttt{VMCS} contains many data-fields that are related to aspects of a vir
 
 \subsection{Updating PTE}
 
-To change page's attributes, we need to change the bits in the corresponding PTE. In a multi-processor system(SMP), updating global data needs to hold a global lock in order to synchronize with other threads. Since our module is a 3rd-party module to windows kernel, we don't have the information for the windows kernel's private variables such as the spinlock that synchronize the updating of page tables. 
+We modify the bits in \texttt{PTE} to change a page's attribute. Updating system metadata such as the page table needs synchronization with other system components. Typically, the modifier should hold a global lock first. However, as a third-party kernel module, we do not have such information on Windows internal data.
 
-In an attacking scenario, there will be at least two threads. One calls the victim kernel function, the other keeps modifying the user data that used by the victim kernel function. To win the race, normally the attacker needs to repeat the process as frequent as possible. So is our page fault handler. 
-
-We need to make our operation atomic. As shown in~\autoref{fig:pte}, U/S bit controls whether the page is a user page of a kernel page. R/W controls whether the page is writable. The PTE data structure on 32-bit system is defined in~\autoref{fig:ptestruct}.
 
 %%\begin{lstlisting}[style=code, float]
 %\begin{lstlisting}[style=code] 
@@ -140,42 +128,10 @@ We need to make our operation atomic. As shown in~\autoref{fig:pte}, U/S bit con
   \label{fig:ptestruct}
 \end{figure}
 
-Usually, in C code, we write something like the following to update a bit field. Where pPte is a pointer that points to a PTE. We want to update its ``U/S bit'', which is the ``Owner''. By setting it to 0, we set the page as a kernel page. 
 
-%\begin{lstlisting}[style=code] 
-%pPte->u.Hard.Owner = 0;
-%\end{lstlisting}
+In a typical kernel-level TOCTOU attacking scenario, the attacker races with the kernel at full speed, so will our mitigation triggered. We modify the page table rapidly. Hence we need to make our operation as atomic as possible. ~\autoref{fig:ptestruct} shows the \texttt{PTE} data structure defined in C on a 32-bit system. The C code at \texttt{\textcircled{1}} changes the \texttt{Owner} a.k.a \texttt{U/S} bit to zero, which makes it a kernel-mode page. \texttt{\textcircled{2}} is the assembly code generated by a compiler, where once C statement needs three assembly instructions. However, during the three instructions, the current thread may be interrupted, or other threads may also update the same \texttt{PTE} due to the race condition, which occurs multiple times when we test the exploit agast \name. We use the locked atomic instruction~\cite{intelmanualchapter8} instead of the compiler-generated assembly code, as shown at \texttt{\textcircled{3}}. It guarantees that the update on one \texttt{PTE} is intact. 
 
-This one line C code is an assignment statement. Different than it appears, it's not an atomic operation. Its assembly code shown in the following:
-
-%\begin{lstlisting}[style=code] 
-%mov eax, dword ptr [pPte]
-%mov ecx, dword ptr [eax]
-%and ecx, 0FFFFFFFBh
-%mov dword ptr [eax], ecx
-%\end{lstlisting}
-
-
-%\begin{figure}[th]
-%  \includegraphics[width=0.47\textwidth]{figures/pteasm}
-%  \centering
-%  \caption{C code for changing one bit in the PTE structure and the corresponding assembly code generated by Microsoft C/C++ compiler.}
-%  \label{fig:ptestruct}
-%\end{figure}
-The assembly code is generated by compiler, it needs three instructions to update a bit in memory. First, 1)read memory into a register; 2)update the bit in the register; 3)write the register back to memory. During the three instructions, the current thread may be interrupted, and other thread may update the memory during this time. In such a case, the register value that hold by the first thread is already outdated, but it still will be written to the memory later. Normally that wouldn't happen so often, but it's an issue in our mitigation again TOCTOU vulnerability.
-
-To solve it, we first choose to use spinlocks to synchronize all the PTE updating operation within our module. The spinlocks do cause extra performance overhead, but it only becomes significant when under attack. Under normal circumstances, the performance overhead is modest, as evaluated in~\autoref{sec:evaluation}.  
-
-Later we learned that Intel supports locked atomic operations on memory locations. One of the mechanism is bus locking, which use the ``LOCK'' instruction prefix~\cite{intelmanualchapter8}. For example, to set/unset bits in a PTE, we can use the following instructions.
-
-%\begin{lstlisting}[style=code] 
-%mov eax, 'addr'
-%lock or/and [eax], 'mask'
-%\end{lstlisting}
-
-In line 1, eax stores the memory address. All the memory reading/writing and change bits are done within line 2.
-
-But this still can't entirely solve the synchronize issue with the operating system's MMU component. This issue can be solved when the idea being adopted by the operating system and let it be part of the MMU. 
+In the future, if the operating system takes such mitigation into its source tree, it will solve such a synchronization issue entirely.
 
 \subsection{TLB Flushing}
 %A translation lookaside buffer(TLB), as mentioned earlier, is a memory cache that is used to store the mappings between virtual pages and physical pages. Different than data cache, TLB is not entirely transparent to the operating system. When operating system updates page tables, corresponding TLB entries need to be invalidated.
@@ -191,9 +147,7 @@ But this still can't entirely solve the synchronize issue with the operating sys
 
 When we apply our mitigation on real hardware instead of a virtual machine, one crucial issue is the need to flush the TLB.  Translation Lookaside Buffer (TLB) is a memory cache used to reduce the time taken to access a virtual memory location. It stores the recent translations of virtual memory to physical memory. Different than data cache, TLB is not entirely transparent to the operating system. When the operating system updates a page table entry, the corresponding TLB entry needs to be invalidated.
 
-Instruction INVLPG invalidates a TLB entry. It only has a source operand, which is a virtual memory address. INVLPG only affects the current CPU. However, on a multiple processor system, each processor core has its TLB. Therefore we need to do this on every core. For this purpose, we need to issue intel-processor interruption (IPI) to each core through APIC. 
-
-Symmetric multiprocessing (SMP) system uses IPI messages to distribute interrupts among the processors in the system or execute system-wide functions such as booting up processors or distributing work among a group of processors. 
+Instruction INVLPG invalidates a TLB entry. It only has a source operand, which is a virtual memory address. INVLPG only affects the current CPU. However, on a multiple processor system, each processor core has its TLB. Therefore we need to do this on every core. For this purpose, we need to issue intel-processor interruption (IPI) to each core through APIC. Symmetric multiprocessing (SMP) system uses IPI messages to distribute interrupts among the processors in the system or execute system-wide functions such as booting up processors or distributing work among a group of processors. 
 
 Intel's Advanced Programmable Interrupt Controller (APIC) is a family of interrupt controllers. It is more advanced than Intel's 8259 Programmable Interrupt Controller (PIC). Nowadays, SMP systems with multiple processors utilize APIC. The APIC is a split architecture design, with a local APIC usually integrated into the processor and an optional I/O APIC on a system bus. The local APIC performs two primary functions for the processor:
 It receives interrupts from the processor's interrupt pins, internal sources, and an external I/O APIC. It sends these to the processor core for handling.
@@ -227,7 +181,7 @@ In this project, we find a Windows kernel internal function, KeFlushSingleTb(). 
 
 As mentioned earlier, to solve the problem that a user thread tries to write a protected page, instead of crashing the thread immediately, our approach is to hold the thread for some milliseconds, waiting for the function to end. To avoid any deadlock or blockage caused by a faulty program, we only allow for several retries. 
 
-Since it's troublesome to call a series of undocumented functions to handle exceptions. We choose to let the operating system terminating it. We clears ``p'' bit of the corresponding PTE as well as changing the error code to a value that indicates ``accessing an invalid page'' instead of ``writing an read-only page''. Because we can't synchronize with MMU, when we passing the exception to the original page fault handler, the PTE's attributes could be changed within the short period of time due to another SMAP exception, this could happen especially in the attacking scenario. 
+Since it is troublesome to call a series of undocumented functions to handle exceptions. We choose to let the operating system terminating it. We clears ``p'' bit of the corresponding PTE as well as changing the error code to a value that indicates ``accessing an invalid page'' instead of ``writing an read-only page''. Because we can't synchronize with MMU, when we passing the exception to the original page fault handler, the PTE's attributes could be changed within the short period of time due to another SMAP exception, this could happen especially in the attacking scenario. 
 
 %global hook, it may use shared memory,  before put it here, probably should figure out how page permits works on shared page
 

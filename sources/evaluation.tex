@@ -238,7 +238,7 @@ The exploit creates two threads. One thread first allocates a virtual page at ad
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/ms08061case2}
   \centering
-  \caption{The attack thread tries to flip the data within the attack window, between instruction circle-2 and circle-3. The kernel first touches the page at instruction circle-1, then the mitigation protects it afterward until the end of the current system call, creating the larger page-protect-window. As soon as the attack thread writes the protected page, the page fault handler suspends it until the protection ends.}
+  \caption{The attack thread tries to flip the data within the attack window, between instruction \texttt{\textcircled{2}} and \texttt{\textcircled{3}}. The kernel first touches the page at instruction \texttt{\textcircled{1}}, then the mitigation protects it afterward until the end of the current system call, creating the larger page-protect-window. As soon as the attack thread writes the protected page, the page fault handler suspends it until the protection ends.}
   \label{fig:ms08061case}
 \end{figure}
 
