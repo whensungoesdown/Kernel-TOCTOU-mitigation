@@ -24,10 +24,11 @@ For the write access, we stale the user thread until the current system call end
 %We also implement a hypervisor which can confine a system wide feature such as SMAP to a specific process. We observe that not all the processes need to be monitored such as process that already run with administrator or system privilege. Because kernel TOCTOU vulnerabilities are mostly used to escalate privilege, only services that has interface exposed and alien process are the main suspects of such attack. With our hypervisor, process can be specified according to the system policy, it can greatly reduce system overhead.
 
 SMAP is a system-wide CPU feature. It is active when the SMAP bit in the CR4 control register is set.  Once enabled, it affects every process in the system. The mitigation is to protect the kernel against the malicious user process. In most cases, the attacker uses kernel TOCTOU vulnerability to further escalate privilege. Hence, many trusted processes don't need protection. Processes that are already running at a high privilege also don't need it. 
+\hb{totally not able to understand what you are trying to say in above paragraphs.}
 
-To contain SMAP within each process, we develop a light-weight hypervisor. It monitors the process scheduling. Each process has its own set of control registers, established by the hypervisor. When scheduling a new process, it brings the new control register values to the hardware. Hence, the SMAP bit is set only when the current process matches the policy. This way the mitigation is more configurable and it introduces less overhead.
+To contain SMAP within each process, \hb{why SMAP need to be contained in each process, then you can tell how briefly} we develop a light-weight hypervisor. It monitors the process scheduling. Each process has its own set of control registers, established by the hypervisor. When scheduling a new process, it brings the new control register values to the hardware. Hence, the SMAP bit is set only when the current process matches the policy. This way the mitigation is more configurable and it introduces less overhead \hb{this maybe the first sentence in the beginning}.
 
-The light-weight hypervisor itself is easy to configure for other applications. It is also a contribution of this paper.
+The light-weight hypervisor itself is easy to configure for other applications. It is also a contribution of this paper.\hb{why throw this sentence here? what do you want to express here??}
 
 
 
