@@ -3,20 +3,19 @@
 \section{\name}
 \label{sec:design}
 
-In this section, we present the design of our project. It has two major parts, the \textbf{system module} setups SMAP environment, monitors kernel to user space accesses, intercepts and handles related page faults and makes the page attributes transitioning. The other part is the \textbf{hypervisor}. As briefly mentioned in the introduction, the hypervisor in charges of isolating the SMAP feature to certain processes.
-
+In this section, we present the design of \name. It has two parts; one module intercepts the system's page fault handler to process \texttt{SMAP} exception and other virtual page related exceptions; the other module is the run-time load hypervisor isolates the system-wide \texttt{SMAP} feature to a specific process.
 
 \subsection{System Module}
 
 \textbf{\textit{Monitoring Kernel to Userspace Access.}} The biggest challenge we meet is how to monitor kernel-to-userspace behavior efficiently. Read memory is such an ordinary CPU operation so that no mechanism is available for monitoring a broad range of memory. Since \texttt{SMAP} accurately serves the purpose, we want to leverage it in a novel way, not for what it initially designed.
 
-However, not every aspect of the \texttt{SMAP} is a perfect fit. In an ideal situation, the hardware should report each kernel-to-userspace access and locks user memory at word granularity until we choose to cancel it.  However, \texttt{SMAP} only provides page granularity. Moreover, the \texttt{SMAP} exception is fatal to the system. From its original intent, the operating system should crash when it receives such an exception.
+However, not every aspect of the \texttt{SMAP} perfectly fits. In an ideal situation, the hardware should report each kernel-to-userspace access and locks user memory at word granularity until we choose to cancel it.  However, \texttt{SMAP} only provides page granularity. Moreover, the \texttt{SMAP} exception is fatal to the system. From its original intent, the operating system should crash when it receives such an exception.
 
 
 
 We respond to the challenge with a novel method of recovering from the exception. First of all, we intercept the operating system's page fault handler by replacing the corresponding vector (14) in the \texttt{Interrupt Descriptor Table (IDT)}. Secondly, we can not let the kernel handle it because Windows does not support \texttt{SMAP}. Considering the reason for raising a \texttt{SMAP} exception is that the kernel access a user-mode page, then the way to solve this will be to put this page into kernel space. After that, re-executing the faulting instruction will comfort the CPU. If we do not take this way, then after the \texttt{SMAP} exception raised, either disable the \texttt{SMAP} feature from \texttt{CR4.SMAP} or temporarily disable it through setting \texttt{EFLAGS.AC} is too late. 
 
-Putting the page into kernel space has another benefit: protecting the page from other user-mode threads, which is what we need to prevent the race condition on the variable between the kernel and user program. However, the entire page's protection may block other legit read and write operations on the rest of the data. We will discuss the conflicts caused by this later in the section.
+Putting the page into kernel space has another benefit: protecting the page from other user-mode threads, which we need to prevent the race condition on the variable between the kernel and user programs. However, the entire page's protection may block other legit read and write operations on the rest of the data. We will discuss the conflicts caused by this later in the section.
 
 %\subsection{Page Privilege Transition} % transition or conversion? Or something else?
 
