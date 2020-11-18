@@ -4,8 +4,6 @@
 \label{sec:background}
 
 
-%TOCTOU is a vulnerability class caused by changes in a system between checking a condition and using that check results. Typically, a variable changes after it passes the sanity check. It is a classical type of issue that has two decades of history. Many previous research works have addressed this issue~\cite{dean2004fixing}~\cite{borisov2005fixing}. To distinguish it from the relatively new kernel-level TOCTOU, we first briefly introduce it\hb{you should say there are existing works aiming at mitigating this issue. then you can give an example. Why do you have to talk abour to distinguish it from new kernel level ??}. ~\autoref{fig:toctou} shows a classic TOCTOU issue.
-
 TOCTOU is a vulnerability class caused by changes in a system between checking a condition and using that check results. Typically, a variable or system state changes after it passes the sanity check. It is a classic vulnerability, mostly amount file system APIs. Many previous research works have addressed it~\cite{dean2004fixing}~\cite{borisov2005fixing}. Before introducing the relatively new kernel-level TOCTOU, we first briefly describe the classic TOCTOU as shown in~\autoref{fig:toctou}.
 
 
@@ -28,7 +26,6 @@ Assume this code piece belongs to a setuid program. It first validates that the 
 
 %Essentially, TOCTOU vulnerability occurs between security boundaries. The less privileged sector deceives the privileged sector to do unexpected actions. The non-atomic or repeated operation on the same variable is the root cause.
 
-%\hb{Dont understand this pragraph, maybe you can clearly describe the attack, like how it could open another file and why}
 
 \subsection{Kernel-level TOCTOU Vulnerability}
 
@@ -161,3 +158,80 @@ Fortunately, we notice an Intel CPU feature so-called \texttt{Supervisor Mode Ac
 \texttt{SMAP} is enabled when \texttt{CR4.SMAP} sets to 1. SMAP can be temporarily disabled for direct memory accesses by setting the \texttt{EFLAGS.AC} flag, and the \texttt{stac} and \texttt{clac} instructions set or clear the flag. Doing so indicates that the kernel is fully aware the userspace-access behavior. For example, Linux kernel supports \texttt{SMAP} since version 3.7. The kernel-to-userspace accesses must go through two gateway functions \texttt{copy\_to\_user()} and \texttt{copy\_from\_user()}, in which \texttt{SMAP} is temporarily disabled.
 
 However, Windows does not support \texttt{SMAP} still. It takes a different approach: ``probe'' and ``capture'' user-mode data from each system call. \texttt{ProbeForRead()}~\cite{probeforread} and \texttt{ProbeForWrite()} validates user-mode buffer. It also checks whether the buffer belongs to userspace by comparing the buffer address to a pre-defined value. This mechanism is effective if done correctly and thoroughly. However, kernel components such as Win32k still failed to practice the ``probe'' and ``capture'' in a large portion of their code. Because Win32k still couples with user-mode components, it will cost huge engineering effort to change how it directly access user-mode data.
+
+\subsection{Intel Virtualization Technology}
+
+Intel \texttt{Virtual-Machine Extensions (VMX)} provides hardware-assistant virtualization, which adds 13 new instructions: \texttt{VMPTRLD}, \texttt{VMPTRST}, \texttt{VMCLEAR}, \texttt{VMREAD}, \texttt{VMWRITE}, \texttt{VMCALL}, \texttt{VMLAUNCH}, \texttt{VMRESUME}, \texttt{VMXOFF}, \texttt{VMXON}, \texttt{INVEPT}, \texttt{INVVPID}, and \texttt{VMFUNC}. \texttt{VMX} supports two modes, namely root and non-root mode, where in root mode runs the hypervisor, and virtual machines or called guest runs in non-root mode. On x86 architecture, the CPU has 4 protection rings, wherethe kernel runs at \texttt{ring 0}, the highest priority ring, and the user programs runs at \texttt{ring 3}, while the other two rings are not used. With VMX, the root model is often viewed as the \texttt{ring -1}. 
+
+\texttt{VMXON}/\texttt{VMXOFF} enters/exits \texttt{VMX} mode. The \texttt{Virtual Machine Control Structure (VMCS)} is the most important data structure, which stores the data and state of one virtual CPU for one virtual machine. Each core in a physical CPU has a \texttt{VMCS} pointer. It points to the physical address of one \texttt{VMCS}. \texttt{VMPTRLD} loads the \texttt{VMCS} pointer from physical memory and makes it active and current. On contrary, \texttt{VMCLEAR} stores \texttt{VMCS} active states back to memory and makes it inactive. Although hypservisor fully aware the physical address of each \texttt{VMCS} but it can not modify them directly. All the operationgs on \texttt{VMCS} should go through instruction \texttt{VMREAD} and \texttt{VMWRITE}. 
+
+The \texttt{VMCS} contains many data-fields that are related to aspects of a virtual machine. They are organized into six logical groups, namely, \texttt{Guest-state area}, \texttt{Host-state area}, \texttt{VM-execution control fields}, \texttt{VM-exit control fields}, \texttt{VM-entry control fields}, and \texttt{VM-exit information fields}. The last four groups compose \texttt{VMX controls}, which control the virtual machine's behavior such as when to exit to the hypervisor. In \texttt{VMX}'s term, \texttt{VM entry} is the transition into the \texttt{VMX} non-root operation while \texttt{VM exit} is the transition from the \texttt{VMX} non-root virtual machine to the VMX root  hypervisor. When VM exit, the processor stores its state into the \texttt{Guest-state area} and loads \texttt{Host-state area} into hardware. In contrast, it loads \texttt{Guest-state area} and stores \texttt{Host-state area} when entering the virtual machine.
+
+\subsection{x86 Architecture}
+
+In this part, we briefly describe background information regarding x86 architecture. These mechanisms are more-or-less use in \name. Topics such as \texttt{IPI} and \texttt{APIC} may fall into this category loosely.
+
+\textbf{\textit{Virtual Memory Space.}} Vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv.
+
+
+
+\textbf{\textit{Page Table.}} The \texttt{Memory Management Unit (MMU)} uses page tables to map physical pages to virtual pages~\cite{intelpaging} so that each process in the system can have a flat virtual memory space. However, to store \texttt{PTE}, the page table's memory usage is unignorable, even on a 32-bit system with a virtual 4GB address. Therefore the page table uses a hierarchy structure to save memory. As shown in~\autoref{fig:pagetable}, the virtual address splits into three parts. The last 12-bit is the byte offset on the page, while the first two 10-bit are the index of the page table base (\texttt{CR3}) and \texttt{Page Directory (PD)}. The table is composed of 4KB pages.  The system swaps out long-time unvisited page table pages to save physical memory. 
+
+%As shown in~\autoref{fig:pte}, the least significant bit being zero indicates this page is not present in the physical memory, which brings the following issue. 
+
+When we walk through the page table, it is inevitable to encounter an invalid page-table page, which was not a problem because the system will automatically bring it back by another page fault regarding page absence. However, this becomes a problem since we are already in the context of a \texttt{SMAP} page fault. The swapping process involves the system reading disk, which means more system calls. Due to the reasons mentioned above, system calls inevitably trigger more \texttt{SMAP} exceptions, which form a dead loop. Therefore, to solve this issue brings one of the necessities of developing a hypervisor-based solution to contain \texttt{SMAP} to the process level. 
+
+
+
+\begin{figure}[th]
+  \includegraphics[width=0.47\textwidth]{figures/pagetable}
+  \centering
+  \caption{Linear-Address Translation to a 4-KBbyte Page using 32-Bit Paging~\cite{guide2011intel}}
+  \label{fig:pagetable}
+\end{figure}
+\textbf{\textit{Translation Lookaside Buffer}}
+
+
+\textbf{\textit{Segment in Protected Mode.}} CPL DPL RPL.
+
+
+\textbf{\textit{Interrupt Descriptor Table.}} The \texttt{Interrupt Descriptor Table (IDT)} is a data structure used on the x86 architecture to implement an interrupt vector table. The processor uses the \texttt{IDT} to determine the correct response to interrupts and exceptions. \texttt{IDTR} is the register on each processor to store the address of the \texttt{IDT}.
+
+\textbf{\textit{Exception \& Interrupt.}} Vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv.
+
+\textbf{\textit{Gate.}} Code modules in lower privilege segments can only access modules operating at higher privilege segments through a tightly controlled and protected interface called a \textbf{gate}.  There are four types of gate, namely, \textbf{task gate}, \textbf{trap gate}, \textbf{interrupt gate}, and \textbf{call gate}. Fully describe and distinguish them is out of the paper's scope. The project only involves the interrupt gate.
+
+The vectors in the IDT go through either the interrupt gate or trap gate. The difference between them is as follows. If the interrupt or exception handler is called through an interrupt gate, the processor clears the \texttt{interrupt enable flag (IF)} in the \texttt{EFLAGS} register to prevent subsequent interrupts from interfering with the execution of the handler.  When the processor invokes a handler through a trap gate, it does not change the IF flag. Having \texttt{EFLAGS.IF} set is a requirement to control stack depth, which also involves what type of interrupt controller installed in the system. In this project, we observed that the processor invokes the page fault handler through an interrupt gate. 
+
+
+
+
+\textbf{\textit{Trap Frame.}} Vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv.
+
+\textbf{\textit{Inter-processor Interrupt.}}  It is an interrupt controller mechanism to interrupt another processor or group of processors on the system bus. They are used for software self-interrupts, interrupt forwarding, or preemptive scheduling. In \name, we use \texttt{IPI} to flush \texttt{TLB} cache on all the processors.
+
+\textbf{\textit{Local APIC.}} Intel's Advanced Programmable Interrupt Controller (APIC) is a family of interrupt controllers. It is more advanced than Intel's 8259 Programmable Interrupt Controller (PIC). Nowadays, SMP systems with multiple processors utilize APIC. The APIC is a split architecture design, with a local APIC usually integrated into the processor and an optional I/O APIC on a system bus. The local APIC performs two primary functions for the processor:
+It receives interrupts from the processor's interrupt pins, internal sources, and an external I/O APIC. It sends these to the processor core for handling.
+It sends and receives IPI messages to and from other logical processors on the system bus in multiple-processor systems.
+The external I/O APIC is part of Intel's system chipset. It is responsible for receiving interrupts generated by system hardware and I/O devices and forwarding them to the local APIC as interrupt messages. A processor can generate IPIs by programming the interrupt command register (ICR) in its local APIC. Writing to the ICR generates an IPI message on the system bus or the APIC bus. When the target processor receives an IPI message, its local APIC handles the message automatically using information included in the message such as vector number and trigger mode. The IPI mechanism sends interrupts for a specific vector number, and special-purpose interrupts to processors on the system bus. Local APIC registers are memory-mapped to a 4-KByte region of the processor's physical address space with an initial starting address of EFF00000H. The software interacts with the local APIC by reading and writing its registers. It also can change the initial mapping to a different 4-KByte region for all the local APICs. The presence of a local APIC can be detected using the CPUID instruction. Execute CPUID with source operand of 1 in the EAX register, then bit 9 of returned feature flags in EDX register indicate a local APIC.
+
+
+\begin{figure}[th]
+  \includegraphics[width=0.40\textwidth]{figures/ia32apicbase}
+  \centering
+  \caption{\texttt{IA32\_APIC\_BASE} MSR}
+  \label{fig:ia32apicbase}
+\end{figure}
+
+There is only one MSR associated with local APIC, \texttt{IA32\_APIC\_BASE}. As shown in~\autoref{fig:ia32apicbase}, the BSP flag indicates if the processor is the bootstrap processor (BSP); ``APIC global enable/disable'' enables/disables the APIC; APIC base specifies the base address of the APIC registers. This 24-bit value needs to be extended by 12 bits at the low end to form the base address. As formerly mentioned, this value by default is 0xFEE00000.
+
+The primary local APIC facility for issuing IPIs is the interrupt command register (ICR), as shown in~\autoref{fig:icr}. It is a 64-bit local APIC register that allows the operating system to specify and send IPIs to processors in the system.
+
+
+\begin{figure}[th]
+  \includegraphics[width=0.40\textwidth]{figures/icr}
+  \centering
+  \caption{Interrupt Command Register (ICR)}
+  \label{fig:icr}
+\end{figure}
+

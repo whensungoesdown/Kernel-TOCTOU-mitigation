@@ -21,18 +21,21 @@ Putting the page into kernel space has another benefit: protecting the page from
 
 
 
-\textbf{\textit{Page Attribute Transition.}} The modifications on the page attribute, including privilege level and read/write, is the core of this mitigation. To change the attribute, we need to find the corresponded \texttt{Page Table Entry (PTE)}.  In x86 architecture, the \texttt{Memory Management Unit (MMU)} uses page tables to map physical pages to virtual pages~\cite{intelpaging} so that each process in the system can have a flat virtual memory space. However, to store \texttt{PTE}, the page table's memory usage is unignorable, even on a 32-bit system with a virtual 4GB address. Therefore the page table uses a hierarchy structure to save memory. As shown in~\autoref{fig:pagetable}, the virtual address splits into three parts. The last 12-bit is the byte offset on the page, while the first two 10-bit are the index of the page table base (\texttt{CR3}) and \texttt{Page Directory (PD)}. The table is composed of 4KB pages.  The system swaps out long-time unvisited page table pages to save physical memory. As shown in~\autoref{fig:pte}, the least significant bit being zero indicates this page is not present in the physical memory, which brings the following issue. 
+\textbf{\textit{Page Attribute Transition.}} The modifications on the page attribute, including privilege level and read/write, is the core of this mitigation. To change the attribute, we need to find the corresponded \texttt{Page Table Entry (PTE)}.  
 
-When we walk through the page table, it is inevitable to encounter an invalid page-table page, which was not a problem because the system will automatically bring it back by another page fault regarding page absence. However, this becomes a problem since we are already in the context of a \texttt{SMAP} page fault. The swapping process involves the system reading disk, which means more system calls. Due to the reasons mentioned above, system calls inevitably trigger more \texttt{SMAP} exceptions, which form a dead loop. Therefore, to solve this issue brings one of the necessities of developing a hypervisor-based solution to contain \texttt{SMAP} to the process level. 
+% move to background, rewrite this
+%In x86 architecture, the \texttt{Memory Management Unit (MMU)} uses page tables to map physical pages to virtual pages~\cite{intelpaging} so that each process in the system can have a flat virtual memory space. However, to store \texttt{PTE}, the page table's memory usage is unignorable, even on a 32-bit system with a virtual 4GB address. Therefore the page table uses a hierarchy structure to save memory. As shown in~\autoref{fig:pagetable}, the virtual address splits into three parts. The last 12-bit is the byte offset on the page, while the first two 10-bit are the index of the page table base (\texttt{CR3}) and \texttt{Page Directory (PD)}. The table is composed of 4KB pages.  The system swaps out long-time unvisited page table pages to save physical memory. As shown in~\autoref{fig:pte}, the least significant bit being zero indicates this page is not present in the physical memory, which brings the following issue. 
 
-
-
-\begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/pagetable}
-  \centering
-  \caption{Linear-Address Translation to a 4-KBbyte Page using 32-Bit Paging~\cite{guide2011intel}}
-  \label{fig:pagetable}
-\end{figure}
+%When we walk through the page table, it is inevitable to encounter an invalid page-table page, which was not a problem because the system will automatically bring it back by another page fault regarding page absence. However, this becomes a problem since we are already in the context of a \texttt{SMAP} page fault. The swapping process involves the system reading disk, which means more system calls. Due to the reasons mentioned above, system calls inevitably trigger more \texttt{SMAP} exceptions, which form a dead loop. Therefore, to solve this issue brings one of the necessities of developing a hypervisor-based solution to contain \texttt{SMAP} to the process level. 
+%
+%
+%
+%\begin{figure}[th]
+%  \includegraphics[width=0.47\textwidth]{figures/pagetable}
+%  \centering
+%  \caption{Linear-Address Translation to a 4-KBbyte Page using 32-Bit Paging~\cite{guide2011intel}}
+%  \label{fig:pagetable}
+%\end{figure}
 
 Every page in the virtual memory has an entry in the page table. As shown in~\autoref{fig:pte}, the \texttt{User/Supervisor} decides whether this is a kernel page or a user page. When set, it is a user page; otherwise, it is a kernel page.
 
