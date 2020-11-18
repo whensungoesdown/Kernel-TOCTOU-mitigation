@@ -4,7 +4,11 @@
 \label{sec:background}
 
 
-TOCTOU is a vulnerability class caused by changes in a system between checking a condition and using that check results. Typically, a variable changes after it passes the sanity check. It is a classical type of issue that has two decades of history. Many previous research works have addressed this issue~\cite{dean2004fixing}~\cite{borisov2005fixing}. To distinguish it from the relatively new kernel-level TOCTOU, we briefly introduce it\hb{you should say there are existing works aiming at mitigating this issue. then you can give an example. Why do you have to talk abour to distinguish it from new kernel level ??}. ~\autoref{fig:toctou} shows a classic TOCTOU issue.
+%TOCTOU is a vulnerability class caused by changes in a system between checking a condition and using that check results. Typically, a variable changes after it passes the sanity check. It is a classical type of issue that has two decades of history. Many previous research works have addressed this issue~\cite{dean2004fixing}~\cite{borisov2005fixing}. To distinguish it from the relatively new kernel-level TOCTOU, we first briefly introduce it\hb{you should say there are existing works aiming at mitigating this issue. then you can give an example. Why do you have to talk abour to distinguish it from new kernel level ??}. ~\autoref{fig:toctou} shows a classic TOCTOU issue.
+
+TOCTOU is a vulnerability class caused by changes in a system between checking a condition and using that check results. Typically, a variable or system state changes after it passes the sanity check. It is a classic vulnerability, mostly amount file system APIs. Many previous research works have addressed it~\cite{dean2004fixing}~\cite{borisov2005fixing}. Before introducing the relatively new kernel-level TOCTOU, we first briefly describe the classic TOCTOU as shown in~\autoref{fig:toctou}.
+
+
 \begin{figure}[th]
 	\includegraphics[width=0.47\textwidth]{figures/toctou}
 	\centering
@@ -22,9 +26,9 @@ TOCTOU is a vulnerability class caused by changes in a system between checking a
 
 Assume this code piece belongs to a setuid program. It first validates that the ``pathname'' is readable, and if so, open the file for reading. However, the attacker can change the file system between the two system calls to trick the setuid program into opening a file that it should not.
 
-Essentially, TOCTOU vulnerability occurs between security boundaries. The less privileged sector deceives the privileged sector to do unexpected actions. The non-atomic or repeated operation on the same variable is the root cause.
+%Essentially, TOCTOU vulnerability occurs between security boundaries. The less privileged sector deceives the privileged sector to do unexpected actions. The non-atomic or repeated operation on the same variable is the root cause.
 
-\hb{Dont understand this pragraph, maybe you can clearly describe the attack, like how it could open another file and why}
+%\hb{Dont understand this pragraph, maybe you can clearly describe the attack, like how it could open another file and why}
 
 \subsection{Kernel-level TOCTOU Vulnerability}
 
