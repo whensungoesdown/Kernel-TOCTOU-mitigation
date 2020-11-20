@@ -36,10 +36,10 @@ We chose several non-trivial applications to demonstrate the performance overhea
   \includegraphics[width=0.47\textwidth]{figures/performance4}
   \centering
   \caption{Performance overhead in non-trivial applications. Overhead mostly being introduced on system calls that need to fetch user-mode parameters}
-  \label{fig:performance}
+  \label{fig:ktoctou-performance}
 \end{figure}
 
-~\autoref{fig:performance} shows the performance overhead of our mitigation in several non-trivial application. Some of those applications potentially could be the trampoline service of kernel TOCTOU attacks.
+~\autoref{fig:ktoctou-performance} shows the performance overhead of our mitigation in several non-trivial application. Some of those applications potentially could be the trampoline service of kernel TOCTOU attacks.
 For web server software such as Nginx. We test its performance by counting the accumulated response time for 10000 web requests. For compression software such as zlib, we test it with compressing large files. For sqlite3, we use speedtest1.c which is a common performance testing program.
 
 The result shows that the performance overhead is acceptable. Because only the system calls that have user-mode buffer as their parameters will trigger SMAP exceptions. 
