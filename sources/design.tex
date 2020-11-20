@@ -1,7 +1,7 @@
 %! TEX root = 'main.tex'
 
 \section{\name Design}
-\label{sec:design}
+\label{sec:ktoctou-design}
 
 In this section, we present the design of \name. Two modules compose the core functions of this mitigation. One module intercepts the system's page fault handler to process \texttt{SMAP} exceptions. The other module, a run-time hypervisor, isolates the system-wide feature \texttt{SMAP} to specific processes.
 
@@ -48,7 +48,7 @@ Every page in the virtual memory has an entry in the page table. As shown in~\au
 
 
 
-We get various information in the context of a page fault handler. The \texttt{CR2} register stores the faulting virtual address, which, regarding \texttt{SMAP}, is the user-mode address that the kernel accessed. The \texttt{CR3} register stores the physical address of the current page table base, with which we walk through the page table to locate the corresponded \texttt{PTE}. Additionally, we get the error code, \texttt{CS:EIP}, \texttt{SS:ESP} and \texttt{EFLAGS} from the  current kernel stack. Regarding \texttt{SMAP} exception, those are the context frame when the kernel raised the exception. Error code indicates the cause of the exception. We will discuss more details in~\autoref{sec:implementation}.
+We get various information in the context of a page fault handler. The \texttt{CR2} register stores the faulting virtual address, which, regarding \texttt{SMAP}, is the user-mode address that the kernel accessed. The \texttt{CR3} register stores the physical address of the current page table base, with which we walk through the page table to locate the corresponded \texttt{PTE}. Additionally, we get the error code, \texttt{CS:EIP}, \texttt{SS:ESP} and \texttt{EFLAGS} from the  current kernel stack. Regarding \texttt{SMAP} exception, those are the context frame when the kernel raised the exception. Error code indicates the cause of the exception. We will discuss more details in~\autoref{sec:ktoctou-implementation}.
 
 
 
