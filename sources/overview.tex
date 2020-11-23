@@ -36,13 +36,18 @@ The main challenges are:
 When the kernel accesses a user address, getting notified is the most challenging issue. Because the processor reading memory is such an ordinary operation, no official hardware feature is available for monitoring that in a broad range of memory. We abuse a hardware feature SMAP. It was initially designed to prevent the attacker from tricking the kernel into getting shellcode or malicious data from userspace. However, one main character of this feature is that when the kernel accesses a user address, the processor raises a page fault exception. This part accurately serves our purpose, so we want to leverage it in a novel way.
 
 Subject to the x86 architecture, the protection has to base on a page granularity. To protect even one byte, we have to deal with an entire page.
-First, we separate the subsequent user reads from writes. The reads are harmless.  When we temporarily release a page, we also set this page as read-only to ensure no following write. When a user writes on the protected page, we make the thread suspend on the writing instruction and wait until the current system call ends.
+First, we separate the subsequent user reads from writes. The reads are harmless.  When we temporarily release a page, we also set this page as read-only to ensure no write. When a user writes on the protected page, we make the thread suspend on the writing instruction and wait until the current system call ends.
 
-(not finished)
+As previously mentioned in ~\autoref{sec:background}, the kernel-level TOCTOU problems happen inside system calls. We hook Windows internal functions to known when a system call ends and release the pages the system call accessed. Also, we monitor the creation and termination for both processes and threads in the system and use Windows internal data structures to distinguish each thread, namely, TEB.
+
+We develop a light-weight hypervisor to confine the SMAP feature into specific processes. It makes debugging less painful to us, and it is also necessary to prevent SMAP exceptions from recurring, which causes a dead loop.
+
+~\autoref{fig:ktoctou-overview} shows the high-level overview. The hypervisor enables SMAP in one process, that is, the current. The kernel accessed three user pages, as marked in the user process. One user thread in the same process tries to access those pages. The read is allowed, where the page is released and set read-only. However, the page fault handler suspends the write to avoid any data inconsistency in the kernel.
+
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/ktoctou-overview}
   \centering
-  \caption{ }
+  \caption{The hypervisor is capable of confining the system-wide feature SMAP into one process. The processor raises page fault exception when the kernel accesses userspace so that we can protect those pages. Other user threads can read a protected page but can not write. The write will raise another page fault exception, where the page fault handler will block the write instruction until the system call ends.}
   \label{fig:ktoctou-overview}
 \end{figure}
