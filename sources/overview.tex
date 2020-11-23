@@ -1,6 +1,9 @@
 \section{Overview}
 \label{sec:ktoctou-overview}
 
+
+
+
 \subsection{Threat Model}
 \label{sec:ktoctou-threatmodel}
 
@@ -11,3 +14,35 @@ We aim at the Windows OS, a complicated operating system. \name will not work on
 %Without investigation,  we can not be sure that the mitigation will work on other OS, even the underlying mechanism should work.\hb{you dont need to write this in the threat model} 
 
 Considering we leverage a hardware feature from Intel CPU, The host system should use Intel CPU with SMAP capability.
+
+
+\subsection{High-Level Design and Challenges}
+
+The kernel double fetching a user address may cause a TOCTOU vulnerability. From a practical point of view, we can not make the kernel change its double-fetch behavior. Instead, we want to make the two fetches always get the same value, thus no vulnerability. The high-level idea is as follows.  When the kernel accesses a user address, we froze the containing page so that no other user thread can overwrite it.
+
+
+The main challenges are:
+
+\begin{itemize}
+	\item How can we know when the kernel accesses a user address?
+	\item It is overkill to froze a whole page just for one variable, and read should allow.
+	\item The two fetches should happen within a short time, more specifically, within the same system call. 
+	\item Windows is a complex operating system, if not the most complex system. How is it practical to enable a system-wide hardware feature without crash the system?
+\end{itemize}
+
+
+\subsection{Approach Overview}
+
+When the kernel accesses a user address, getting notified is the most challenging issue. Because the processor reading memory is such an ordinary operation, no official hardware feature is available for monitoring that in a broad range of memory. We abuse a hardware feature SMAP. It was initially designed to prevent the attacker from tricking the kernel into getting shellcode or malicious data from userspace. However, one main character of this feature is that when the kernel accesses a user address, the processor raises a page fault exception. This part accurately serves our purpose, so we want to leverage it in a novel way.
+
+Subject to the x86 architecture, the protection has to base on a page granularity. To protect even one byte, we have to deal with an entire page.
+First, we separate the subsequent user reads from writes. The reads are harmless.  When we temporarily release a page, we also set this page as read-only to ensure no following write. When a user writes on the protected page, we make the thread suspend on the writing instruction and wait until the current system call ends.
+
+(not finished)
+
+\begin{figure}[th]
+  \includegraphics[width=0.47\textwidth]{figures/ktoctou-overview}
+  \centering
+  \caption{ }
+  \label{fig:ktoctou-overview}
+\end{figure}

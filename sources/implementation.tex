@@ -153,6 +153,9 @@ Instruction INVLPG invalidates a TLB entry. It only has a source operand, which 
 
 In this project, we find a Windows kernel internal function, KeFlushSingleTb(). It sends IPI to all processors to invalid a particular TLB entry, as mentioned above. The hardware abstraction layer (HAL) eventually sends the IPI, so the kernel does not need to mind the actual hardware differences.
 
+\subsection{Hooking System Calls}
+
+NtVirtualProtect()
 
 \subsection{Crashing a Faulty Thread}
 
