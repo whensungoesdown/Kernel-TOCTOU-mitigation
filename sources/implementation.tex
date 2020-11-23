@@ -17,13 +17,19 @@ Exception handling is the primary method of \name. We leverage \texttt{SMAP} exc
 We need to handle page fault exceptions before the system does.
 Because the page fault caused by \texttt{SMAP} is fatal. It is not recoverable by design. Additionally, the followed exceptions that are related to the protection should not handle by the system either. We must also be careful with the exception that should send to the system, such as page absence. Because if we accidentally process those, it may cause the system to malfunction. To identify the cause of a page fault is not easy.  When page fault happens, the CPU pushes a 32-bit error code into the kernel stack with the format shown in~\autoref{fig:pagefaulterrorcode}.  Unfortunately, there is no exact error code regarding \texttt{SMAP}.  Still we can decide from the values in the kernel stack such as \texttt{CS:EIP}, \texttt{SS:ESP}, \texttt{EFLAGS} and the value from \texttt{CR2} and \texttt{CR3}.
 
+%\begin{figure}[th]
+%  \includegraphics[width=0.47\textwidth]{figures/pagefaulterrorcode}
+%  \centering
+%  \caption{Page Fault Error Code.~\cite{intelinterrupt} Notice, there is no exact error code regarding \texttt{SMAP}. In the context of an \texttt{SMAP} exception, the \texttt{U/S} bit is zero, which indicates kernel-mode access. We still need to combine this information with the faulting address and \texttt{CS} segment register to confirm the cause.}
+%  \label{fig:pagefaulterrorcode}
+%\end{figure}
+
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/pagefaulterrorcode}
+  \includegraphics[width=0.47\textwidth]{figures/pagefaulterrorcode2}
   \centering
-  \caption{Page Fault Error Code.~\cite{intelinterrupt} Notice, there is no exact error code regarding \texttt{SMAP}. In the context of an \texttt{SMAP} exception, the \texttt{U/S} bit is zero, which indicates kernel-mode access. We still need to combine this information with the faulting address and \texttt{CS} segment register to confirm the cause.}
+  \caption{Page Fault Error Code.~\cite{intelinterrupt} \textbf{P}: \textbf{0} The fault was caused by a non-present page; \textbf{1} the fault was caused by a page-level protection violation. \textbf{W/R}: \textbf{0} The access causing the fault was a read; \textbf{1} the fault causing the fault was a write. \textbf{U/S}: \textbf{0} A supervisor-mode access caused the fault; \textbf{1} A user-mode access caused the fault. \textbf{Notice}, there is no exact error code regarding SMAP. In the context of an SMAP exception, the U/S bit is zero, which indicates kernel-mode access. We still need to combine this information with the faulting address and CS segment register to confirm the cause.}
   \label{fig:pagefaulterrorcode}
 \end{figure}
-
 
 
 We need to filter out the irrelevant exceptions first. For example, \texttt{P:0} in the error code indicates the page absence, and we must pass it to the original page fault handler without any modification. We have not observed a \texttt{SMAP} exception on the invalid page, even though the error code may have combined bits. Other than that, \texttt{U/S:1} shows it is user-mode access, which will not cause \texttt{SMAP} exception.  The \texttt{Current Privilege Level (CPL)} in the \texttt{cs} segment register also reveals the context. Additionally, we keep track of the protected or relevant pages, which helps to identify the exceptions.
@@ -153,9 +159,10 @@ Instruction INVLPG invalidates a TLB entry. It only has a source operand, which 
 
 In this project, we find a Windows kernel internal function, KeFlushSingleTb(). It sends IPI to all processors to invalid a particular TLB entry, as mentioned above. The hardware abstraction layer (HAL) eventually sends the IPI, so the kernel does not need to mind the actual hardware differences.
 
-\subsection{Hooking System Calls}
+\subsection{Intercepting System Calls}
 
-NtVirtualProtect()
+In the user read scenario, \name changes the protected page back to user-mode with a read-only permit. To prevent user threads from change page permits through APIs, we need to intercept system calls such as NtProtectVirtualMemory(), corresponding to the upper-layer Win32 API VirtualProtect(). To go around this system call protection, the attacker may find different ways, which we need to improve. It becomes another arms race between the attacker and the defender, which is out of this paper's scope.
+
 
 \subsection{Crashing a Faulty Thread}
 
