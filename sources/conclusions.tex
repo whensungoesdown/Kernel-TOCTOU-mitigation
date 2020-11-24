@@ -1,4 +1,8 @@
 \section{Conclusion}
 \label{sec:ktoctou-conclusion}
 
-In this paper, we creatively use a hardware feature SMTP of Intel CPU to solve a recently popular and serious vulnerability kernel TOCTOU. To the best of our knowledge, our mitigation is the only run-time protection for this type of vulnerability. We implemented and tested on Windows XP and Windows 7 platforms, it can effectively protect known vulnerabilities. Also, under normal operating conditions, we evaluate it with non-trivial applications and the performance overhead is modest.
+
+Kernel-level TOCTOU vulnerability is severe and widespread among operating system kernels. We learn its memory access pattern by studying real-world samples and develop a fuzzing tool that
+effectively finds kernel-level TOCTOU candidates in Windows.
+
+Moreover, we creatively use an Intel hardware feature SMAP to mitigate such vulnerability. To the best of our knowledge, it is the first run-time protection for kernel-level TOCTOU. We test it against real-world vulnerabilities, and it effectively protects the Windows kernel from attacks. We also develop a lightweight hypervisor to confine the system-wide feature SMAP into specific processes. We evaluate the mitigation and lightweight hypervisor with 18 benchmark programs and real-world applications. The performance overhead is acceptable (less than 10\% on average).
