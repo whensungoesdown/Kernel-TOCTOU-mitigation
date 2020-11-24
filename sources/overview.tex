@@ -25,9 +25,9 @@ The main challenges are:
 
 \begin{itemize}
 	\item How can we know when the kernel accesses a user address?
-	\item It is overkill to froze a whole page just for one variable, and read should allow.
+	\item It is overkill to froze an entire page just for one variable, and reads should allow.
 	\item The two fetches should happen within a short time, more specifically, within the same system call. 
-	\item Windows is a complex operating system, if not the most complex system. How is it practical to enable a system-wide hardware feature without crash the system?
+	\item Windows is a complex operating system, if not the most complex system. How is it practical to enable a system-wide hardware feature such as SMAP without crash the system?
 \end{itemize}
 
 
