@@ -63,12 +63,12 @@ We take 500 system calls as the standard to measure the following: how many page
 	\centering
 %	\begin{tabular}{ l|p{0.04\textwidth}|p{0.108\textwidth}|l|p{0.045\textwidth}|p{0.045\textwidth} } 
 %	\begin{tabular}{ c@{}|@{}c@{}|@{}c@{}|@{}c@{}|@{}c@{}|@{}c }   
-	\begin{tabular}{@{}>{\centering\arraybackslash}m{1.35cm}@{}|
-			@{}>{\centering\arraybackslash}m{1.10cm}@{}|
-			@{}>{\centering\arraybackslash}m{2.20cm}@{}|
+	\begin{tabular}{@{}>{\centering\arraybackslash}m{1.40cm}@{}|
+			@{}>{\centering\arraybackslash}m{1.15cm}@{}|
+			@{}>{\centering\arraybackslash}m{2.30cm}@{}|
 			c|
-			@{}>{\centering\arraybackslash}m{1.10cm}@{}|
-			@{}>{\centering\arraybackslash}m{0.92cm}@{} } 
+			@{}>{\centering\arraybackslash}m{1.15cm}@{}|
+			@{}>{\centering\arraybackslash}m{0.97cm}@{} } 
 		\hline
 		Programs & System Calls & Protected Pages(r, w) & \textbf{avg.} & Double Fetch & Time (ms)\\ 
 		\hline
@@ -193,10 +193,10 @@ The column "Double Fetch" shows the user-addresses that are read over twice duri
 		\label{table:doubleread}
 		\centering
 		%\begin{tabular}{ l l l l }
-		\begin{tabular}{@{}>{\centering\arraybackslash}m{1.70cm}@{}|
-				@{}>{\centering\arraybackslash}m{1.70cm}@{}|
-				@{}>{\centering\arraybackslash}m{1.70cm}@{}|
-				@{}>{\centering\arraybackslash}m{1.70cm}@{} } 
+		\begin{tabular}{@{}>{\centering\arraybackslash}m{2.05cm}@{}|
+				@{}>{\centering\arraybackslash}m{2.05cm}@{}|
+				@{}>{\centering\arraybackslash}m{2.05cm}@{}|
+				@{}>{\centering\arraybackslash}m{2.05cm}@{} } 
 			\hline
 			Cr3 & Eip & Addr. & Teb \\
 			\hline
@@ -234,7 +234,7 @@ We write a proof-of-concept (POC) program to exploit the CVE-2008-2252 vulnerabi
 
 
 
-The exploit creates two threads. One thread first allocates a virtual page at address 0 then use it as the parameter for the vulnerable system call. Using page zero is a necessity to bypass the sanity check of the system call NtUserMessageCall(). Then, it repeatedly calls the upper layer vulnerable Win32 API SendMessage() (\texttt{WM\_COPYDATA}) with the malicious parameters. SendMessage() calls a lower layer function NtUserMessageCall(), which eventually calls the vulnerable win32k internal function xxxInterSendMsgEx(). The other thread keeps flipping the key variable on page zero simultaneously.
+The exploit creates two threads. One thread first allocates a virtual page at address 0 then use it as the parameter for the vulnerable system call. Using page zero is a necessity to bypass the sanity check of the system call NtUserMessageCall(). Then, it repeatedly calls the upper layer vulnerable Win32 API \texttt{SendMessage()} (\texttt{WM\_COPYDATA}) with the malicious parameters. \texttt{SendMessage()} calls a lower layer function \texttt{NtUserMessageCall()}, which eventually calls the vulnerable win32k internal function \texttt{xxxInterSendMsgEx()}. The other thread keeps flipping the key variable on page zero simultaneously.
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/ms08061case2}
@@ -272,14 +272,14 @@ CVE-2013-1254. Similar to the one above mentioned, CVE-2013-1254 is another typi
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/cve-2013-1254}
   \centering
-  \caption{The family of the 27 vulnerabilities in the win32k module is mostly around the parameter sanity check. The checking code with \texttt{\_W32UserProbeAddress} makes sure that the parameters passed in reside in userspace. It is a classic time-to-check-to-time-to-use. When checking, the ``[exc+8]'' is less than \texttt{\_W32UserProbeAddress}, when using, it could change to a kernel address by another user-mode thread. Furthermore, the malicious address that passed the sanity check may point to an essential kernel data structure, hence gives the attacker kernel write capability.}
+  \caption{The family of the 27 vulnerabilities in the win32k module is mostly around the parameter sanity check. The checking code with \texttt{\_W32UserProbeAddress} makes sure that the parameters passed in reside in userspace. It is a classic time-to-check-to-time-to-use. When checking, the \texttt{[exc+8]} is less than \texttt{\_W32UserProbeAddress}, when using, it could change to a kernel address by another user-mode thread. Furthermore, the malicious address that passed the sanity check may point to an essential kernel data structure, hence gives the attacker kernel write capability.}
   \label{fig:cve-2013-1254}
 \end{figure}
 
 
 
 
-They have the same patterns. The code is mostly around the \texttt{\_W32UserProbeAddress}, which is a value that indicates the highest possible address for user-mode variables. As shown in~\autoref{fig:cve-2013-1254}, the flawed code in red first gets the value from ``ecx+8'' and compare it with \texttt{\_W32UserProbeAddress}. Afterward, it gets the data again to eax, which is the second fetch. The attacker can abuse this, changing the value to bypass the parameter sanity check, for example, send in a kernel-mode address. 
+They have the same patterns. The code is mostly around the \texttt{\_W32UserProbeAddress}, which is a value that indicates the highest possible address for user-mode variables. As shown in~\autoref{fig:cve-2013-1254}, the flawed code in red first gets the value from \texttt{ecx+8} and compare it with \texttt{\_W32UserProbeAddress}. Afterward, it gets the data again to eax, which is the second fetch. The attacker can abuse this, changing the value to bypass the parameter sanity check, for example, send in a kernel-mode address. 
 
 
-Therefore, when the instruction ``cmp [ecx+8], eax'' triggers the SMAP exception, our mitigation protects this page until the current system call ends.
+Therefore, when the instruction \texttt{cmp [ecx+8]}, eax triggers the SMAP exception, our mitigation protects this page until the current system call ends.
