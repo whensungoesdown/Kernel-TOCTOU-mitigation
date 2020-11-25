@@ -34,48 +34,39 @@ back to userspace, allowing user threads to read. When user threads read a kerne
 \end{figure}
 
 
-\textbf{\textit{Page Attribute Transition.}} The modifications on the page attribute, including privilege level and read/write, is the core of this mitigation. To change the attribute, we need to find the corresponded Page Table Entry (PTE).  
 
-% move to background, rewrite this
-%In x86 architecture, the \texttt{Memory Management Unit (MMU)} uses page tables to map physical pages to virtual pages~\cite{intelpaging} so that each process in the system can have a flat virtual memory space. However, to store \texttt{PTE}, the page table's memory usage is unignorable, even on a 32-bit system with a virtual 4GB address. Therefore the page table uses a hierarchy structure to save memory. As shown in~\autoref{fig:pagetable}, the virtual address splits into three parts. The last 12-bit is the byte offset on the page, while the first two 10-bit are the index of the page table base (\texttt{CR3}) and \texttt{Page Directory (PD)}. The table is composed of 4KB pages.  The system swaps out long-time unvisited page table pages to save physical memory. As shown in~\autoref{fig:pte}, the least significant bit being zero indicates this page is not present in the physical memory, which brings the following issue. 
+\textbf{\textit{Page Attribute Transition.}}  The modifications on the page attributes are essential to this mitigation. Because changing a user page to kernel-mode is the primary method of protection.  Moreover, to solve reads conflicts, we need to change the page back and forth between kernel-mode and user-mode. 
 
-%When we walk through the page table, it is inevitable to encounter an invalid page-table page, which was not a problem because the system will automatically bring it back by another page fault regarding page absence. However, this becomes a problem since we are already in the context of a \texttt{SMAP} page fault. The swapping process involves the system reading disk, which means more system calls. Due to the reasons mentioned above, system calls inevitably trigger more \texttt{SMAP} exceptions, which form a dead loop. Therefore, to solve this issue brings one of the necessities of developing a hypervisor-based solution to contain \texttt{SMAP} to the process level. 
-%
-%
-%
-%\begin{figure}[th]
-%  \includegraphics[width=0.47\textwidth]{figures/pagetable}
-%  \centering
-%  \caption{Linear-Address Translation to a 4-KBbyte Page using 32-Bit Paging~\cite{guide2011intel}}
-%  \label{fig:pagetable}
-%\end{figure}
+First, we need to locate the page's Page Table Entry (PTE). As mentioned in~\autoref{sec:ktoctou-background}, with paging, every page in the virtual memory has an entry in the page table.  As shown in~autoref{fig:pte}, the User/Supervisor decides whether this is a kernel page or a user page. Set if it is a user page, otherwise a kernel page.
 
-Every page in the virtual memory has an entry in the page table. As shown in~\autoref{fig:pte}, the \texttt{User/Supervisor} decides whether this is a kernel page or a user page. When set, it is a user page; otherwise, it is a kernel page.
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/pte2}
   \centering
-  \caption{U/S, the 'User/Supervisor' bit, controls access to the page based on privilege level. If the bit is set, then this page is considered in user mode space and be accessed by all code; if the bit is not set, then it's considered in kernel mode space and can be accessed only by kernel mode code. }
+  \caption{\textbf{Bit 0} (Present): \textbf{0} indicates an invalid page. \textbf{U/S} (User/Supervisor): \textbf{0} user-mode accesses are not allowed to the page referenced by this entry. \textbf{R/W}: \textbf{0} writes are not allowed to the page.}
   \label{fig:pte}
 \end{figure}
 
 
 
-We get various information in the context of a page fault handler. The CR2 register stores the faulting virtual address, which, regarding SMAP, is the user-mode address that the kernel accessed. The CR3 register stores the physical address of the current page table base, with which we walk through the page table to locate the corresponded PTE. Additionally, we get the error code, CS:EIP, SS:ESP and EFLAGS from the  current kernel stack. Regarding SMAP exception, those are the context frame when the kernel raised the exception. Error code indicates the cause of the exception. We will discuss more details in~\autoref{sec:ktoctou-implementation}.
+We obtain various information in the context of the page fault
+handler to find the corresponding PTE. The CR2 register stores the faulting virtual address. Regarding SMAP, it is the user address that the kernel accessed. The CR3 register stores the physical address
+of the current page table base. The trap frame in the kernel stack contains the error code, CS: EIP, SS: ESP, and EFLAGS, which describes the processor context when the exception happens.
+
+Changing the U/S bit in the PTE makes the user page becomes a kernel page. It is counterintuitive because we usually have the impression that the virtual address between 0x80000000 to 0xFFFFFFFF is the kernel space on Windows 32-bit system. However, there is the Current Privilege Level (CPL) field in the CS segment. The processor maintains this 2-bit field to equal the processor's current privilege level. Meantime, the U/S bit in the PTE decides whether the unprivileged code can access it. Traditionally, we consider the memory space that only the most privileged code (CPL:00) can run as the kernel space. Indeed, it is a considerably complicated mechanism involving more data structure in the processor's microarchitecture, out of this paper's scope. In essence, the U/S bit decides whether the page is a kernel page or a user page, even the virtual address is below 0x80000000.
 
 
-
-By changing the U/S bit in a page's PTE, we can change a user-mode page to kernel-mode. On Windows 32-bit system, we usually have the impression that the virtual address above 0x80000000 to 0xFFFFFFFF is the kernel space. However, the system's current privilege level depends on the Current Privilege Level (CPL) field in the CS segment, which is maintained by the CPU. This 2-bit CPL field in the code segment register is always equal to the CPU's current privilege level. In the meantime, the U/S bit in the PTE decides the code of what privilege can access it, and we consider the memory space that only the most privileged code (CPL:00) can run is the kernel space. Indeed, it is a considerably complicated mechanism involving more data structure in the CPU's microarchitecture, out of this paper's scope. In essence, as aforementioned, this bit decides whether the page is a kernel page or a user page, even the virtual address is below 0x80000000 and surrounded by other user pages, as shown in~\autoref{fig:denyuserwrite}.
 
 \begin{figure}[th]
-  \includegraphics[width=0.37\textwidth]{figures/denyuserwrite}
+  \includegraphics[width=0.47\textwidth]{figures/denyuserwrite3}
   \centering
-  \caption{User-mode thread 0 initiates a system call with parameters. The system call, which runs in the kernel, access the user-mode memory to get the value. This action raises a SMAP exception and entry the exception handler, within which our mitigation changes the page from user-mode to kernel-mode. Therefore it blocks subsequent accesses from other user-mode threads.}
+  \caption{\texttt{\textcircled{1}} User thread 0 invokes a system call with parameters. \texttt{\textcircled{2}} The kernel fetches one of the parameters from userspace hence triggers a SMAP exception. \texttt{\textcircled{3}} Our page fault handler converts the page into kernel-mode to protect it. \texttt{\textcircled{4}} Another user thread 1 tries to read the protected page and triggers an exception due to privilege violation.  \texttt{\textcircled{5}} Again, our page fault handler processes the exception and converts the protected page back to user-mode with a read-only permit. \texttt{\textcircled{6}} The faulting instruction re-execute, and the user thread successfully read the data without knowing the previous exception.}
   \label{fig:denyuserwrite}
 \end{figure}
 
 
 
+~\autoref{fig:denyuserwrite} shows the mitigation convert a low address user page into a kernel page. It is a common situation where user programs invoke a system call and provide parameters. After that, if a user thread accesses a protected page, the processor raises an exception due to the privilege violation. The page fault handler converts this page to user-mode and read-only.
 
 
 \textbf{\textit{Solving Write Conflicts.}} Unlike the read conflicts, we can not make the page writable at any time. Even the write on the rest of the data is benign. Subject to the x86 architecture, the protection has to base on page granularity. We have to make sure that no user-mode threads write the entire page during the system call. However, we can make them wait then write it after the system call. More specifically, once the write raises an exception, we suspend the thread until the current system call ends. We will discuss why it is possible to suspend a thread inside the page fault handler shortly after.
