@@ -3,22 +3,35 @@
 \section{\name Design}
 \label{sec:ktoctou-design}
 
-In this section, we present the design of \name. Two modules compose the core functions of this mitigation. One module intercepts the system's page fault handler to process SMAP exceptions. The other module, a run-time hypervisor, isolates the system-wide feature SMAP to specific processes.
+This section presents the design of \name.  The core of \name includes two key components, the system module and the hypervisor. The system module intercepts the system's page fault handler to process SMAP and relevant exceptions, which is the protection's main logic.  The lightweight hypervisor puts the system into the virtual machine when loaded. Its primary use is to confine the system-wide feature SMAP into specific processes.
 
 \subsection{System Module}
 
-\textbf{\textit{Monitoring Kernel to Userspace Access.}} The biggest challenge we meet is how to monitor kernel-to-userspace behavior efficiently. Read memory is such an ordinary CPU operation so that no mechanism is available for monitoring a broad range of memory. Since SMAP accurately serves the purpose, we want to leverage it in a novel way, not for what it initially designed.
+The system module's core functions include enabling SMAP, recovering from SMAP exceptions, protecting pages, and solving read/writes conflicts. We describe each technique as follows.
 
-However, not every aspect of the SMAP perfectly fits. In an ideal situation, the hardware should report each kernel-to-userspace access and locks user memory at word granularity until we choose to cancel it.  However, SMAP only provides page granularity. Moreover, the SMAP exception is fatal to the system. From its original intent, the operating system should crash when it receives such an exception.
+\textbf{\textit{Monitoring Kernel to Userspace Access. }} The biggest challenge we confront is how to monitor the kernel-to-userspace behavior efficiently. Accessing memory is such an ordinary operation so that no purposeful hardware feature is available for monitoring that.  We notice a rarely memtioned hardware feature SMAP. Its initial design prevents the attacker from tricking the kernel into getting shellcode or malicious data from userspace. When the kernel accesses a user address, the processor raises a page fault exception. This part accurately serves our purpose, so we want to leverage it in a novel way. 
+
+However, not every aspect of this feature perfectly fits our exceptions. If in an ideal situation, the hardware should report on each kernel-to-userspace access and freeze the user memory at machine word granularity. In reality, SMAP only works on the page level, and the exception that it raised is fatal to the system, meaning the operating system should crash when it receives such exceptions.  We eventually find a way to recover it. We intercept the system's page fault handler to handle such exceptions, namely, vector 14 in the IDT. Since Windows does not support SMAP, we do not pass those exceptions to the kernel. Considering the violation of raising a SMAP exception is that the kernel accesses userspace, so puts the corresponding page into kernel space solves the exception. Otherwise, it is then too late to disable SMAP through CR4 or set EFLAGS.AC flag.
+
+
+Putting a page into the kernel not only solves the exception but also protects the page. The user threads no longer can access it, which prevents the race condition between the kernel and user threads. However, it is overkill to protect the entire page and block benign reads and writes on the rest of the data. We discuss the read/writes conflicts in the following section.
 
 
 
-We respond to the challenge with a novel method of recovering from the exception. First of all, we intercept the operating system's page fault handler by replacing the corresponding vector (14) in the Interrupt Descriptor Table (IDT). Secondly, we can not let the kernel handle it because Windows does not support SMAP. Considering the reason for raising a SMAP exception is that the kernel access a user-mode page, then the way to solve this will be to put this page into kernel space. After that, re-executing the faulting instruction will comfort the CPU. If we do not take this way, then after the SMAP exception raised, either disable the SMAP feature from CR4.SMAP or temporarily disable it through setting EFLAGS.AC is too late. 
+\textbf{\textit{Solving Read Conflicts}}. For practical purposes, solving
+read conflicts is essential. It is common to have multiple global
+variables or multiple heap buffers share the same page. Therefore, when we protect an entire page, we block benign access to the rest of the data. It is especially unnecessary because reads do not harm security.
 
-Putting the page into kernel space has another benefit: protecting the page from other user-mode threads, which we need to prevent the race condition on the variable between the kernel and user programs. However, the entire page's protection may block other legit read and write operations on the rest of the data. We will discuss the conflicts caused by this later in the section.
+We solve the read conflicts by setting the protected page
+back to userspace, allowing user threads to read. When user threads read a kernel-mode protected page, the processor raises an exception due to the privilege violation. Therefore our page fault handler gets the notification and sets the page back to userspace. Additionally, the page is also set with a read-only permit to ensure no write. ~\autoref{fig:pagestate} shows the transitions between kernel-mode and user-mode.  We record the original page information to handle various situations and correctly restore it at the end of the system call.
 
-%\subsection{Page Privilege Transition} % transition or conversion? Or something else?
 
+\begin{figure}[th]
+  \includegraphics[width=0.30\textwidth]{figures/pagestate}
+  \centering
+  \caption{Page transits between kernel-mode and user-mode. A user page becomes a kernel page after the kernel access it. If user threads read this page, we change it back to user-mode with a read-only permit. Then this page is also then capable of triggering another SMAP exception if the kernel reaccesses it. Our page handler will suspend any thread that tries to write this page and keep checking the page's status to re-execute until the current system call ends or reaches a time limit. When the current system call ends, this page will be set back to user-mode with its original permits. Thus, the write thread is also released. }
+  \label{fig:pagestate}
+\end{figure}
 
 
 \textbf{\textit{Page Attribute Transition.}} The modifications on the page attribute, including privilege level and read/write, is the core of this mitigation. To change the attribute, we need to find the corresponded Page Table Entry (PTE).  
@@ -61,19 +74,6 @@ By changing the U/S bit in a page's PTE, we can change a user-mode page to kerne
   \label{fig:denyuserwrite}
 \end{figure}
 
-
-
-
-\textbf{\textit{Solving Read Conflicts.}} For practical purposes, solving read conflicts is essential. It is common to have multiple global variables reside on, or multiple heap buffers share the same page. Therefore, when we protect a 4KB page for the kernel, we block benign access to other data.  It is unnecessary because reading does not harm.  
-
-We solve the read conflict by taking the protected page back to userspace. Additionally, in the PTE, we also set R/W bit so that the page is read-only. ~\autoref{fig:pagestate} shows the transitions. It is possible because when other user-mode threads read the protected page, it raises a page fault exception regarding privilege violation due to our protection. Therefore we can handle it and let the thread read the page safely. We also record the original page information to handle various situations and correctly restore it at the end of the system call. 
-
-\begin{figure}[th]
-  \includegraphics[width=0.30\textwidth]{figures/pagestate}
-  \centering
-  \caption{Page attributes transit between kernel mode and user mode. When kernel mode code ends, for example, system service returns to user mode, the page will be set back to the original permission}
-  \label{fig:pagestate}
-\end{figure}
 
 
 
