@@ -83,43 +83,24 @@ Changing the U/S bit in the PTE makes the user page becomes a kernel page. It is
 
 
 
-\textbf{\textit{Interrupt and Exception.}} Thread suspending inside the page fault handler seems unusual because both interrupts and exceptions have their handler entries in the Interrupt Descriptor Table (IDT). However, the difference between them is essential.  An interrupt is an asynchronous event that is typically triggered by an I/O device. An exception is a synchronous event generated when the processor detects one or more predefined conditions while executing an instruction. Interrupts have a higher priority than the operating system's scheduler and most of the kernel components. Any job should not take too long inside the interrupt handler~\cite{msdnwatchdog}.  On the contrary, exceptions have the lowest priority in the kernel. In Windows' term, the Interrupt Request Level (IRQL) that the exception handler executes at is \texttt{PASSIVE\_LEVEL}. It means to call for thread scheduling is plausible.
+
+\textbf{\textit{Interrupt and Exception.}} Thread suspending inside the page fault handler seems unusual because the Interrupt Descriptor Table (IDT) includes both interrupts and exceptions. However, there is an essential difference between them. An interrupt is an asynchronous event that is typically triggered by an I/O device. An exception is a synchronous event generated when the processor detects one or more predefined conditions while executing an instruction. Interrupts have a higher priority than the operating system's scheduler and most of the kernel components. Any job that takes too much processing should not be the interrupt handler~\cite{msdnwatchdog}.  On the contrary, exceptions have the lowest priority in the kernel. In Windows' term, the Interrupt Request Level (IRQL) that the exception handler executes is \texttt{PASSIVE\_LEVEL}, meaning call for thread scheduling is plausible.
 
 
-%\subsection{Releasing Protected Pages}
 
-%Whenever a syscall ends, all the protected page that related to it should be released. Their original attributes will be restored. The Thread Environment Block(TEB) is used to identify each thread within the current process. Each thread has its own TEB data and it's address is easy to locate by segment register FS. 
-
-%We hook a Windows internal function in order to know when it's the end of the syscall. 
-
-%\begin{comment}
-%\begin{figure}[th]
-%  \includegraphics[width=0.40\textwidth]{figures/timeline}
-%  \centering
-%  \caption{The page protection period is within one system call cycle, this is based on the fact that kernel TOCTOU vulnerability does not happen across system calls.}
-%  \label{fig:timeline}
-%\end{figure}
-%\end{comment}
-
-\textbf{\textit{Releasing Protected Pages.}} To aware when a system call ends, we choose to intercept a Windows internal function. We keep tracking the page table base and Thread Environment Block (TEB) to distinguish each thread so that we release the involved pages on the system call basis.  
+\textbf{\textit{Releasing Protected Pages.}} To be aware of when a system call ends, we choose to intercept Windows internal functions. We keep tracking the page table base and Thread Environment Block (TEB) to distinguish each thread to release the involved pages on a thread basis.
 
 
-%\subsection{TLB Caching}
 
-\textbf{\textit{Flushing TLB.}} To make PTE modifications taking effect on all the processors, we need to flush Translation Lookaside Buffer (TLB). TLB is a memory cache used to reduce the time taken to access a virtual memory location. It stores the recent translations of virtual memory to physical memory. Different than data cache, TLB is not entirely transparent to the operating system. When the operating system updates a page table entry, the corresponding TLB entry needs to be invalidated.  
-
-As mentioned above, we leverage the page attribute transition to protect and solve conflicts. They are all based on the PTE modification. Hence it is critical to ensure the change on PTE takes effects instantly, especially on a multi-processor system. We examine the method to flush the TLB on the multi-process system through programming the local Advanced Programmable Interrupt Controller (APIC). Eventually, we find a Windows internal function that flushes TLB entries on all the processors with some reverse-engineering effort. Therefore we do not have to consider the underlying hardware differences.
-
+\textbf{\textit{Flushing TLB.}} We need to flush Translation Lookaside Buffer (TLB) to ensure that the page attributes modification is effective on all processors of the system. TLB is a memory cache that stores the recent translation of virtual memory to physical memory. It accelerates the process of accessing virtual memory. Different than data cache, TLB is not entirely transparent to the operating system. When the operating system updates a page table, the corresponding TLB entries need to be invalidated to get new ones. As mentioned above, we leverage the page attribute transition as the main page protection. It is critical to ensure the PTE modification takes effect instantly, especially on a multi-processor system. We examine the method to flush the TLB through local APIC as described in~\autoref{sec:ktoctou-background}. Eventually, we find Windows internal functions that flush TLB entries on all the processors. Therefore we use them and do not have to consider the underlying hardware differences.
 
 
 \subsection{Hypervisor}
 
 
-For \name, the hypervisor plays an essential role in developing and debugging. When we initially enabled SMAP in Windows, instantly, an enormous amount of exceptions flooded the system. The debugger was frozen.  We expected that because we know Windows does not support this feature, and SMAP is system-wide. Moreover, a significant portion of the system calls fetches user-provided parameters and important system data structures such as Process Environment Block (PEB), \texttt{USER\_SHARED\_DATA} that mapped in userspace. 
+The hypervisor plays an essential role in developing and debugging for \name. When we first enabled SMAP in Windows, instantly, an enormous amount of exceptions flooded the system. The debugger was frozen.  It is expected because we know that SMP is a system-wide feature and Windows does not support it. A significant portion of the system calls fetches user-provided parameters and system data such as Process Environment Block (PEB), \texttt{USER\_SHARED\_DATA} mapped in userspace, which all trigger SMAP exceptions.
 
-
-Due to Intel VT virtualization technology's design~\cite{neiger2006intel}, it is possible to load a light-weight hypervisor as a kernel module during run time. Unlike other commercial hypervisors such as Xen, Hyper-V, and VMWare, it does not emulate hardware devices. It merely put the operating system into VM guest mode, and itself becomes the hypervisor, hence monitors system events~\cite{howtohide}.
-
+Due to Intel VT virtualization technology's design~\cite{neiger2006intel}, it is possible to load a light-weight hypervisor as a kernel module during run time. Unlike other commercial hypervisors such as Xen, Hyper-V, and VMWare, it does not emulate hardware devices. It merely put the operating system into VM guest mode, and itself becomes the hypervisor, thus monitors system events~\cite{howtohide}.
 
 \begin{figure}[th]
   \includegraphics[width=0.40\textwidth]{figures/processmap3}
@@ -129,6 +110,6 @@ Due to Intel VT virtualization technology's design~\cite{neiger2006intel}, it is
 \end{figure}
 
 
-By monitoring the process context switch event, namely, operations on the CR3 register, the hypervisor can temporarily enable/disable the SMAP feature to make it only active on a specific process. That is when this process is running on the CPU. As shown in~\autoref{fig:processmap}, \texttt{mov cr3, eax} triggers a VM Exit event, and the hypervisor receives it. If the new CR3 is one of the target processes, the hypervisor sets the CR4.SMAP in the Virtual Machine Control Structure (VMCS) of the guest virtual machine. It is the data structure that updates the real CPU registers when entering the virtual machine. Back to the guest, the SMAP is active while the process is running. When this process is switching out, the hypervisor again receives the event regarding CR3 operation. It then unset CR4.SMAP. Therefore, this particular process will have the illusion that SMAP is active continually while others feel the opposite.
+By monitoring the process context switch event, namely, operations on the CR3 register, the hypervisor can temporarily enable/disable SMAP to make it only effective in the context of specific processes. ~\autoref{fig:processmap} shows that \texttt{mov cr3, eax} triggers a VM Exit event, and the hypervisor receives it. If the new CR3 belongs to one of the target processes, the hypervisor sets the CR4.SMAP in the Virtual Machine Control Structure (VMCS), which is the data structure that updates the real CPU registers when entering the virtual machine. After returning to the guest virtual machine, the SMAP is active. When this process switches out, the hypervisor again receives the event and unset CR4.SMAP. Therefore, this particular process has the illusion that SMAP is active in the system while other processes feel the opposite.
 
-The hypervisor inevitably brings performance overhead. However, it makes the mitigation more configurable. Due to the nature of local privilege escalation attacks, system processes already with high privilege are not likely threats. Hence no protection on them, which reduces the overall overhead.  Additionally, as previously mentioned, to prevent SMAP recurring caused dead loop, the feature isolation is also necessary. Therefore we consider the hypervisor framework as one contribution of this paper.
+The hypervisor inevitably brings performance overhead. However, it makes the mitigation more configurable. Due to the nature of local privilege escalation attacks, system processes that already have high privilege are not threats. Therefore there is no need to protect them, which reduces the overall performance overhead.  Additionally, as previously mentioned, SMAP confinement is also necessary to prevent deadlock caused by nested SMAP exceptions. Therefore we consider the hypervisor framework as one contribution of this paper.
