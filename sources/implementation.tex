@@ -9,20 +9,12 @@ This section provides the implementation details and discusses the issues that w
 
 
 
-\subsection{Page Faults}
+\textbf{\textit{Page Faults.}} Exception handling is the primary method of \name. We leverage SMAP exception to notify when the kernel accesses userspace and use privilege-violation exceptions to solve the subsequent read and write conflicts. Those exceptions are all handled through the page fault handler, vector 14, in the IDT. The page fault is not an error but an exception raised when accessing a virtual page. It is the MMU's mechanism to implement virtual memory, and the page fault is recoverable. 
 
+We handle page fault exceptions before the kernel does and pass irrelevant exceptions to it. By design, the SMAP exception indicates a fatal error that the system should stop working immediately. On the other side, we must be cautious about sending all the irrelevant exceptions to the kernel. It may lead to system malfunctioning or crash processes if we miss one. 
 
-Exception handling is the primary method of \name. We leverage SMAP exception to notify the kernel-to-userspace access and next use exception to solve the read and write conflicts. Those events are all categorized as page faults. A page fault is a type of exception raised by the CPU when accessing a virtual page. The page ``fault'' mostly is not an error. It is the CPU's mechanism to implement virtual memory. For example, a page absence page fault is recoverable once the system assigns the physical page back.
+~\autoref{fig:pagefaulterrorcode} shows a 32-bit error code that indicates the cause of the page fault. The processor automatically pushes it into the kernel stack. However, there is no exact error code regarding SMAP.  We can analyze it from the trap frame and the values of CR2 and CR3.
 
-We need to handle page fault exceptions before the system does.
-Because the page fault caused by SMAP is fatal. It is not recoverable by design. Additionally, the followed exceptions that are related to the protection should not handle by the system either. We must also be careful with the exception that should send to the system, such as page absence. Because if we accidentally process those, it may cause the system to malfunction. To identify the cause of a page fault is not easy.  When page fault happens, the CPU pushes a 32-bit error code into the kernel stack with the format shown in~\autoref{fig:pagefaulterrorcode}.  Unfortunately, there is no exact error code regarding SMAP.  Still we can decide from the values in the kernel stack such as CS:EIP, SS:ESP, EFLAGS and the value from CR2 and CR3.
-
-%\begin{figure}[th]
-%  \includegraphics[width=0.47\textwidth]{figures/pagefaulterrorcode}
-%  \centering
-%  \caption{Page Fault Error Code.~\cite{intelinterrupt} Notice, there is no exact error code regarding \texttt{SMAP}. In the context of an \texttt{SMAP} exception, the \texttt{U/S} bit is zero, which indicates kernel-mode access. We still need to combine this information with the faulting address and \texttt{CS} segment register to confirm the cause.}
-%  \label{fig:pagefaulterrorcode}
-%\end{figure}
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/pagefaulterrorcode2}
@@ -32,12 +24,8 @@ Because the page fault caused by SMAP is fatal. It is not recoverable by design.
 \end{figure}
 
 
-We need to filter out the irrelevant exceptions first. For example, P:0 in the error code indicates the page absence, and we must pass it to the original page fault handler without any modification. We have not observed a SMAP exception on the invalid page, even though the error code may have combined bits. Other than that, U/S:1 shows it is user-mode access, which will not cause SMAP exception.  The Current Privilege Level (CPL) in the CS segment register also reveals the context. Additionally, we keep track of the protected or relevant pages, which helps to identify the exceptions.
 
-
-
-After filtering, ~\autoref{algo:pagefaulthandler} shows the basic algorithm to handle the SMAP and related exceptions.
-
+We filter out the mitigation-irrelevant exceptions first because they may be nested exceptions caused by our operations, such as page table walking. For example, P:0 in the error code indicates a page absence, and we must pass it to the original page fault handler without any modification. The error code may have multiple bits combined, but we have not observed a SMAP exception on an invalid page so far. The U/S bit and CPL field in the CS segment register reveal whether the kernel caused the exception. Additionally, we keep track of the protected and relevant pages, which helps solve the subsequent conflicts. ~\autoref{algo:pagefaulthandler} shows the basic algorithm to handle the exception.
 
 \begin{algorithm}[ht]
 \begin{algorithmic}[1]
@@ -84,50 +72,17 @@ After filtering, ~\autoref{algo:pagefaulthandler} shows the basic algorithm to h
 
 
 
-\textbf{\textit{Enable Interrut.}} The page fault exception is called through an Interrupt Gate~\cite{intelinterrupt}. Therefore, when entering the page fault handler, the CPU clears EFLAGS:IF automatically prevents subsequent interrupts from interfering with the handler's execution. Since we need to walk through the page table, it may access an invalid page, which triggers a nested page fault exception to bring the page back from disk. Therefore we need to set EFLAGS:IF before the page table walk.
 
-\subsection{Hypervisor}
-
-% moved to background
-%Intel \texttt{Virtual-Machine Extensions (VMX)} provides hardware-assistant virtualization, which adds 13 new instructions: \texttt{VMPTRLD}, \texttt{VMPTRST}, \texttt{VMCLEAR}, \texttt{VMREAD}, \texttt{VMWRITE}, \texttt{VMCALL}, \texttt{VMLAUNCH}, \texttt{VMRESUME}, \texttt{VMXOFF}, \texttt{VMXON}, \texttt{INVEPT}, \texttt{INVVPID}, and \texttt{VMFUNC}. \texttt{VMX} supports two modes, namely root and non-root mode, where in root mode runs the hypervisor, and virtual machines or called guest runs in non-root mode. On x86 architecture, the CPU has 4 protection rings, where the kernel runs at \texttt{ring 0}, the highest priority ring, and the user programs runs at \texttt{ring 3}, while the other two rings are not used. With VMX, the root model is often viewed as the \texttt{ring -1}. \texttt{VMXON}/\texttt{VMXOFF} enters/exits \texttt{VMX} mode. The \texttt{Virtual Machine Control Structure (VMCS)} is the most important data structure, which stores the data and state of one virtual CPU for one virtual machine. Each core in a physical CPU has a \texttt{VMCS} pointer. It points to the physical address of one \texttt{VMCS}. \texttt{VMPTRLD} loads the \texttt{VMCS} pointer from physical memory and makes it active and current. On contrary, \texttt{VMCLEAR} stores \texttt{VMCS} active states back to memory and makes it inactive. Although hypservisor fully aware the physical address of each \texttt{VMCS} but it can not modify them directly. All the operationgs on \texttt{VMCS} should go through instruction \texttt{VMREAD} and \texttt{VMWRITE}.
+\textbf{\textit{Enabling Interrupt in the Page Fault Handler.}} The processor calls the page fault exception as an interrupt gate. Hence when entering the page fault handler, the processor clears EFLAGS: IF bit automatically. It prevents subsequent interruptions from interfering with the handler's execution. Therefore, we first store a copy of the CR2 register.  Then set the IF flag before we walk through the page table because it may contain swapped-out pages, and we need the system brings them back from the disk.
 
 
+\textbf{\textit{Hypervisor.}} Our light-weight hypervisor set the current system into a guest virtual machine. Unlike a bare-metal hypervisor, it does not emulate hardware devices. All the cores on the physical processor enter the VMX mode, and each core has its VMCS that represents a virtual core in the guest.  
 
-We do not use a bare-metal hypervisor because we create only one virtual machine, the current system, and do not need to emulate hardware. We use multiple VMCS that each represent one logical processor of the physical CPU and loads the logical processor's run-time state. Essentially, each processor exists in the system has its VMCS, hence no need to reload VMCS pointers.
-
-%The \texttt{VMCS} contains many data-fields that are related to aspects of a virtual machine. They are organized into six logical groups, namely, \texttt{Guest-state area}, \texttt{Host-state area}, \texttt{VM-execution control fields}, \texttt{VM-exit control fields}, \texttt{VM-entry control fields}, and \texttt{VM-exit information fields}. The last four groups compose \texttt{VMX controls}, which control the virtual machine's behavior such as when to exit to the hypervisor. In \texttt{VMX}'s term, \texttt{VM entry} is the transition into the \texttt{VMX} non-root operation while \texttt{VM exit} is the transition from the \texttt{VMX} non-root virtual machine to the VMX root  hypervisor. When VM exit, the processor stores its state into the \texttt{Guest-state area} and loads \texttt{Host-state area} into hardware. In contrast, it loads \texttt{Guest-state area} and stores \texttt{Host-state area} when entering the virtual machine. For our run-time load hypervisor, we set up those two areas mostly identical to the current CPU state but with different entry addresses, which, in root mode, serves the VM exit event handler's purpose. With that, we call \texttt{VMLAUNCH} respectively on each processor to enter the virtual machine. We control when the virtual machine exit through \texttt{VMX control} settings. 
-
-To monitor the process context switch, we need the virtual machine exit on control register operations. In the event handler, the hypervisor can modify CPU state through Guest-state area, in this case, it is CR4.SMAP. After that, the hypervisor invokes VMRESUME to re-enter the virtual machine.
-
-\subsection{Updating PTE}
-
-We modify the bits in PTE to change a page's attribute. Updating system metadata such as the page table needs synchronization with other system components. Typically, the modifier should hold a global lock first. However, as a third-party kernel module, we do not have such information on Windows internal data.
+The virtual machine exits to the hypervisor when operating on control registers. To monitor the process context switch, we focus on CR3. When the next process to run is our target, the hypervisor set CR4.SMAP bit in the Guest-state area of VMCS. After re-entering the virtual machine, the SMAP is active on this core. Similarly, the hypervisor disables SMAP if the target process is switched out.
 
 
-%%\begin{lstlisting}[style=code, float]
-%\begin{lstlisting}[style=code] 
-%typedef struct _PTE_HARDWARE
-%{
-%	ULONG Valid : 1;
-%	ULONG Write : 1;
-%	ULONG Owner : 1;
-%	ULONG WriteThrough : 1;
-%	ULONG CacheDisable : 1;
-%	ULONG Accessed : 1;
-%	ULONG Dirty : 1;
-%	ULONG Reserved : 1;
-%	ULONG Global : 1;
-%	ULONG Ignored: 3;
-%	ULONG PageFrameNumber : 20;
-%} PTE_HARDWARE, *PPTE_HARDWARE;
-%
-%typedef struct _PTE {
-%	union {
-%		ULONG Long;
-%		PTE_HARDWARE Hard;
-%	} u;
-%} PTE, *PPTE;
-%\end{lstlisting}
+\textbf{\textit{Updating PTE.}} 
+Modifications on the page tables need to synchronize with other system components. Typically, the memory management module should hold a global spinlock. However, as a third-party kernel module, we do not have such conditions. In a typical kernel-level TOCTOU attacking scenario, the attacker races with the kernel at full speed. Therefore, our operations should be atomic to avoid conflicts with the kernel. ~\autoref{fig:ptestruct} shows the PTE data structure defined in C code. \texttt{\textcircled{1}} changes the Owner a.k.a U/S bit to zero, which sets this page to kernel-mode. \texttt{\textcircled{2}} is the assembly code generated by a compiler. The one-line C statement becomes three assembly instructions. The problem is that, during the three instructions, the thread may be interrupted or conflicts with other threads that write the same page. It occurs multiple times due to the race conditions when we test exploits against \name, making the mitigation ineffective. To solve this, we use the locked atomic instruction~\cite{intelmanualchapter8}, as shown at \texttt{\textcircled{3}}. 
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/ptestructcode}
@@ -137,43 +92,21 @@ We modify the bits in PTE to change a page's attribute. Updating system metadata
 \end{figure}
 
 
-In a typical kernel-level TOCTOU attacking scenario, the attacker races with the kernel at full speed, so will our mitigation triggered. We modify the page table rapidly. Hence we need to make our operation as atomic as possible. ~\autoref{fig:ptestruct} shows the PTE data structure defined in C on a 32-bit system. The C code at \texttt{\textcircled{1}} changes the Owner a.k.a U/S bit to zero, which makes it a kernel-mode page. \texttt{\textcircled{2}} is the assembly code generated by a compiler, where once C statement needs three assembly instructions. However, during the three instructions, the current thread may be interrupted, or other threads may also update the same PTE due to the race condition, which occurs multiple times when we test the exploit agast \name. We use the locked atomic instruction~\cite{intelmanualchapter8} instead of the compiler-generated assembly code, as shown at \texttt{\textcircled{3}}. It guarantees that the update on one PTE is intact. 
+\textbf{\textit{TLB Flushing.}} When we applied our mitigation on real hardware instead of a virtual machine, our mitigation becomes ineffective because we did not flush the TLB.  TLB is a memory cache that stores the recent translation of virtual memory to physical memory. It accelerates the process of accessing virtual memory. Different than data cache, TLB is not entirely transparent to the operating system. When the operating system updates a page table, the corresponding TLB entries need to be invalidated to get new ones.
 
-In the future, if the operating system takes such mitigation into its source tree, it will solve such a synchronization issue entirely.
+Instruction \texttt{INVLPG} invalidates a TLB entry, but it only affects the current processor. On a multi-processor system, each core has its TLB. Therefore we need to flush it on every core. For this purpose, we need to issue inter-processor interruption (IPI) to each core through local APIC. The multi-processor system uses IPI messages to distribute interrupts among the processors in the system or execute system-wide functions such as booting up processors or distributing work among a group of processors.
 
-\subsection{TLB Flushing}
-%A translation lookaside buffer(TLB), as mentioned earlier, is a memory cache that is used to store the mappings between virtual pages and physical pages. Different than data cache, TLB is not entirely transparent to the operating system. When operating system updates page tables, corresponding TLB entries need to be invalidated.
-%
-%Instruction "INVLPG" is used to invalidate a TLB entry. It has a source operand which is a virtual memory address. "INVLPG" only invalidate TLB entries on the current CPU, so on multiple processor system, we need to execute it on every processor that has the same TLB entry. To do do, we need to issue an inter-processor interruption(IPI) to inform all the CPU cores in the system.
-%
-%IPI allows a processor to send interrupt signals to other processors. It's different than normal "interrupt" which go through an IRQ line. IPI signal needs to be sent via the advanced programmable interrupt controller(APIC) bus which connects all the local APIC of every CPU core.
-%
-%In our implementation, we actually reuse some of the functionality from Windows operating system to issue the IPI for TLB flushing. Because Windows' MMU also need the same function to flush TLB, we found the address of the related internal functions at run-time, call it when we update a PTE. 
-%
+Eventually, we find a Windows kernel internal function, \texttt{KeFlushSingleTb()}. It sends IPI to all processors to invalid a TLB entry.  It calls the hardware abstraction layer (HAL) to send the IPI, so the kernel does not need to care about the actual hardware differences. With this, our mitigation works on the real hardware machine.
+
+
+\textbf{\textit{Intercepting System Calls.}} As mentioned in~\autoref{sec:ktoctou-design}, to solve read conflicts, \name changes the protected page back to user-mode with a read-only permit. However, since it is no longer a kernel page, the attack can change its permits by calling Win32 APIs. Therefore, we need to intercept system calls  such as \texttt{NtProtectVirtualMemory()} to prevent it. Nevertheless, there may be other ways to go around the system call protection, and we should improve it accordingly. It becomes another arms race between the attacker and the defender, which is out of this paper's scope.
 
 
 
-When we apply our mitigation on real hardware instead of a virtual machine, one crucial issue is the need to flush the TLB.  Translation Lookaside Buffer (TLB) is a memory cache used to reduce the time taken to access a virtual memory location. It stores the recent translations of virtual memory to physical memory. Different than data cache, TLB is not entirely transparent to the operating system. When the operating system updates a page table entry, the corresponding TLB entry needs to be invalidated.
+\textbf{\textit{Terminating a Thread.}} When solving the write conflicts, the page fault handler suspends the thread and check the protected page's status periodically. We set a time threshold to avoid deadlock. Therefore, after a few tries, we need to terminate the thread. 
 
-Instruction INVLPG invalidates a TLB entry. It only has a source operand, which is a virtual memory address. INVLPG only affects the current CPU. However, on a multiple processor system, each processor core has its TLB. Therefore we need to do this on every core. For this purpose, we need to issue intel-processor interruption (IPI) to each core through APIC. Symmetric multiprocessing (SMP) system uses IPI messages to distribute interrupts among the processors in the system or execute system-wide functions such as booting up processors or distributing work among a group of processors. 
-
-In this project, we find a Windows kernel internal function, \texttt{KeFlushSingleTb()}. It sends IPI to all processors to invalid a particular TLB entry, as mentioned above. The hardware abstraction layer (HAL) eventually sends the IPI, so the kernel does not need to mind the actual hardware differences.
-
-\subsection{Intercepting System Calls}
-
-In the user read scenario, \name changes the protected page back to user-mode with a read-only permit. To prevent user threads from change page permits through APIs, we need to intercept system calls such as \texttt{NtProtectVirtualMemory()}, corresponding to the upper-layer Win32 API \texttt{VirtualProtect()}. To go around this system call protection, the attacker may find different ways, which we need to improve. It becomes another arms race between the attacker and the defender, which is out of this paper's scope.
+Terminating a thread is not a trivial task. Here we use a trick to let the kernel handle it. We clear the P(present) bit in the PTE and the error code in the kernel stack. Thus, it looks like a thread accesses invalid memory. Then we pass it to the kernel.
 
 
-\subsection{Crashing a Faulty Thread}
 
-As mentioned earlier, to solve the problem that a user thread tries to write a protected page, instead of crashing the thread immediately, our approach is to hold the thread for some milliseconds, waiting for the function to end. To avoid any deadlock or blockage caused by a faulty program, we only allow for several retries. 
-
-Since it is troublesome to call a series of undocumented functions to handle exceptions. We choose to let the operating system terminating it. We clears ``p'' bit of the corresponding PTE as well as changing the error code to a value that indicates ``accessing an invalid page'' instead of ``writing an read-only page''. Because we can't synchronize with MMU, when we passing the exception to the original page fault handler, the PTE's attributes could be changed within the short period of time due to another SMAP exception, this could happen especially in the attacking scenario. 
-
-%global hook, it may use shared memory,  before put it here, probably should figure out how page permits works on shared page
-
-
-\subsection{Special Cases}
-We assume 32bit Windows operating system use the default 2G/2G user/kernel split where user space is below 0x7FFFFFFF. More precisely, a kernel variable MmUserProbeAddress contains the highest possible address for user data, which is set to 0x7FFF0000. And we learn that one page locates at 0x7FFE0000 is defined as \texttt{USER\_SHARED\_DATA}. It's a shared page between user mode and kernel mode, meaning the same physical page is mapped both at 0x7FFE0000 and 0xFFDF0000. It's a read-only page and contains a lot of process settings such as system time. Kernel needs to read this page a lot. We treat such page specially to improve performance. 
-
-
+\textbf{\textit{Special Cases.}} Windows is a complex operating system. There are always cases that we can not comprehend and need to handle specially. For example, \texttt{USER\_SHARED\_DATA} is a shared page between the kernel and user. Windows maps it at both 0x7FFE0000 and 0xFFDF0000. The kernel frequently reads it because it contains settings such as system time. It is a read-only page, and we treat it differently to improve performance. 
