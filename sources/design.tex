@@ -60,7 +60,7 @@ Changing the U/S bit in the PTE makes the user page becomes a kernel page. It is
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/denyuserwrite3}
   \centering
-  \caption{\texttt{\textcircled{1}} User thread 0 invokes a system call with parameters. \texttt{\textcircled{2}} The kernel fetches one of the parameters from userspace hence triggers a SMAP exception. \texttt{\textcircled{3}} Our page fault handler converts the page into kernel-mode to protect it. \texttt{\textcircled{4}} Another user thread 1 tries to read the protected page and triggers an exception due to privilege violation.  \texttt{\textcircled{5}} Again, our page fault handler processes the exception and converts the protected page back to user-mode with a read-only permit. \texttt{\textcircled{6}} The faulting instruction re-execute, and the user thread successfully read the data without knowing the previous exception.}
+  \caption{\texttt{\textcircled{1}} User thread 0 invokes a system call with parameters. \texttt{\textcircled{2}} The kernel fetches one of the parameters from userspace hence triggers a SMAP exception. \texttt{\textcircled{3}} Our page fault handler converts the page into kernel-mode to protect it. \texttt{\textcircled{4}} User thread 1 tries to read the protected page and triggers an exception due to privilege violation.  \texttt{\textcircled{5}} Again, our page fault handler processes the exception and converts the protected page back to user-mode with a read-only permit. \texttt{\textcircled{6}} The faulting instruction re-execute, and the user thread successfully read the data without knowing the previous exception.}
   \label{fig:denyuserwrite}
 \end{figure}
 
@@ -69,20 +69,17 @@ Changing the U/S bit in the PTE makes the user page becomes a kernel page. It is
 ~\autoref{fig:denyuserwrite} shows the mitigation convert a low address user page into a kernel page. It is a common situation where user programs invoke a system call and provide parameters. After that, if a user thread accesses a protected page, the processor raises an exception due to the privilege violation. The page fault handler converts this page to user-mode and read-only.
 
 
-\textbf{\textit{Solving Write Conflicts.}} Unlike the read conflicts, we can not make the page writable at any time. Even the write on the rest of the data is benign. Subject to the x86 architecture, the protection has to base on page granularity. We have to make sure that no user-mode threads write the entire page during the system call. However, we can make them wait then write it after the system call. More specifically, once the write raises an exception, we suspend the thread until the current system call ends. We will discuss why it is possible to suspend a thread inside the page fault handler shortly after.
 
+\textbf{\textit{Solving Write Conflicts.}} We can not allow any user code to write a protected page during its protection,  because unlike reads, the write operation is a security threat. Subject to the x86 architecture, the protection has to base on page granularity.  Therefore, not all the writes on this page will cause the TOCTOU problem. From a compatibility perspective, we also can not terminate every user thread that accesses a protected page. To solve this, we choose to delay the write operation. After the writing instruction caused an exception, our page fault handler suspends the user thread until the end of the system call. Therefore, the protected page remains the same for the kernel, and user threads can also write it after the system call.  We explain the practicality of suspending a thread in the context of page fault exception in the following section.
 
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/reexecute}
+  \includegraphics[width=0.47\textwidth]{figures/reexecute2}
   \centering
-  \caption{We take the delayed access solution when handling a write conflict. Thread one sleeps for a short time in the exception handler, letting the operating system schedule. Recheck the current status when it wakes up. Reexecute the faulting instruction if the protected page is released. Otherwise, wait for the next turn. Moreover, to avoid endless waiting, which may cause a deadlock, the thread will be terminated if it reaches the time threshold.}
+  \caption{To solve this, we choose to delay the write operation. \texttt{\textcircled{1}}  User thread 0 invokes a system call with parameters. \texttt{\textcircled{2}} The kernel fetches one of the parameters from userspace hence triggers a SMAP exception. \texttt{\textcircled{3}} Our page fault handler converts the page into kernel-mode to protect it.  \texttt{\textcircled{4}} User thread 1 tries to \textbf{write} the protected page and triggers an exception due to privilege violation. \texttt{\textcircled{5}} This time, our page fault handler suspends the thread by calling a sleep function, letting the operating system schedule.  It rechecks the page's status periodically when it wakes up. \texttt{\textcircled{6}} When the current system call ends, the mitigation releases all the protected pages related to this thread. \texttt{\textcircled{7}} Meantime, the page fault handler wakes up and realize that the page is released. Therefore it finishes the exception by executing the faulting instruction again.}
   \label{fig:reexecute}
 \end{figure}
 
-
-As shown in ~\autoref{fig:reexecute}, thread 0 invokes a system call with parameters.  \name protects the corresponded page into kernel space once the kernel fetches those parameters. Afterward, thread 1 writes the page, which raises another page fault exception. Inside the handler, \name calls a kernel function, \texttt{KeDelayExecutionTread()}, that suspend the current thread. The thread wakes up periodically to check the page's status. If the page is released, it finishes the exception, re-executes the faulting instruction. Otherwise, \name terminates the thread to prevent any deadlock.
-
-%\subsection{The Differences Between Interrupt and Exception}
+~\autoref{fig:reexecute} shows that thread 0 invokes a system call with parameters. The kernel gets the user parameter so that the corresponded page is protected. Afterward, user thread 1 tries to write the page, which raises a page fault exception due to privilege violation. The page fault handler suspends the current thread by calling a sleep function, namely, \texttt{KeDelayExecutionThread()}. The thread wakes up periodically to check whether the page is released. If so, the exception is finished and re-executes the faulting instruction. Otherwise, the page fault handler may terminate the thread to prevent a deadlock if it takes too long.
 
 
 
