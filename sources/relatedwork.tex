@@ -1,47 +1,26 @@
 \section{Related Work}
 \label{sec:ktoctou-relatedwork}
-%TOCTOU, race condition and double fetches, those are the terms that describe the similar problem that caused by data inconsistency between different parts of a system. It may lead to more serious attacks such as privilege escalation.
-
-\begin{comment}
-\subsection{File System Related TOCTOU}
-It first appeared in UNIX-style file systems~\cite{bishop1996checking}~\cite{bishop1995race}. Typically, it exploits a race condition issue in a setuid program. A setuid program is a special kind of program that runs with root privilege on a regular user's behalf. It can be invoked by a regular user, but when it runs, it has the root privilege which allows it to access any file in the system. Therefor, a setuid program need to check if the user has the right permission before it accesses the file on the user's behalf. If the checking and accessing are not within one atomic operation, it will introduce a race condition problem which let the attacker linking the file path to something else that he has no permission to access. Suppose we have a buggy setuid program  which has a snip of code as the following:
-
-\begin{lstlisting}[basicstyle=\small,style=redkeyword] 
-if (access(filename, W_OK) == 0){
-	fd = open(filename, 0_WRONLY);
-	if (fd == NULL){
-		perror (filename);
-		return(0);
-	}
-/* now write to the file */
-...
-}
-\end{lstlisting}
-
-System call access() checks the user's permission to a file. If the checking failed in the first place, there will be no subsequence call to open(). But, the attacker could simply feed the program with a valid file path that he does have permission, for example, /tmp/x. Next, the setuid program will open() it. Unfortunately, these two steps together are not atomic. Right between them, there is a time window for the attacker to delete /tmp/x and create a hard link for a critical system file such as /etc/shadow, using the same file path /tmp/x. By doing that the attacker will successfully access a critical system file which he doesn't have permission.
-
-This is different than kernel TOCTOU. There is no vulnerable variable, no mistake made by 
-any individual system call. The vulnerability crosses system calls. In order to find such vulnerabilities, researches have been done to record, analyze and categorize file system related system calls~\cite{wei2005tocttou}. Similar issues also  can be found in software such as rpm (software installer), system libraries and web browsers~\cite{yang2012concurrency}.
-
-\end{comment}
-
-%\subsection{Transactional Memory}
-
-%\textbf{Transactional Memory } The kernel TOCTOU vulnerability as a subclass of TOCTOU vulnerability mostly occurs within one syscall. User-mode vulnerable variable is referenced multiple times, but the reader unaware of the data changes due to lack of proper synchronize mechanism. 
-
-\textbf{Transactional Memory}~\cite{herlihy1993transactional}~\cite{shavit1997software}~\cite{rajwar2012intel}~\cite{haring2012ibm}~\cite{jacobi2012transactional}~\cite{click2009azul}~\cite{dice2009early} attempts to simplify concurrent programming by allowing memory read and write instructions to be executed in an atomic way. Usually memory access transactions are short-lived activities only when accessing a small memory area, such as a shared counter or shared double-linked list. Since transactional memory is limited resource, it's not practical to cover large portion of code. 
-
-In order to cover large region of code, one way is to leverage the lightweight transaction mode of hardware-assistant transactional memory~\cite{gupta2009using}, the other is to use software transactional memory\cite{kestor2014trex}. Or combine both hardware and software method together~\cite{zhang2016txrace}. Those projects are mostly focusing bug hunting. To deploy those as mitigations, transaction primitives are needed to add to the source code either by programmers or compilers.
-
-The idea behind bug hunting projects is similar to ours, which is marking a conflict zone and then capturing conflicts. In our case, almost the whole life-span of a system call is marked as the conflict zone. Then hardware feather SMAP and page fault handling mechanism are leveraged to capture and handle conflicts.
-
-%\subsection{Dynamic Binary Instrumentation}
-
-%\textbf{Dynamic Binary Instrumentation } Researchers have proposed multitude of dynamic data race detectors~\cite{savage1997eraser}~\cite{o2003hybrid}~\cite{yu2005racetrack}~\cite{bond2010pacer}~\cite{marino2009literace}~\cite{flanagan2009fasttrack}~\cite{pozniansky2007multirace} for user-mode programs. In essence, these tools monitor memory accesses using dynamic binary instrumentation technique. Dynamic binary instrumentation is a method of analyzing the behavior of an application at runtime through the injection of instrumentation code. It can monitor user-mode memory accesses but only for user programs. Even though it's faster than fully emulated virtual machine such as Bochs, still the biggest concern is its high performance overhead, especially for large scale software.
 
 
-Dynamic Binary Instrumentation is a method of analyzing an application's behavior at run-time through injecting code. It's been often used in data race detectors~\cite{savage1997eraser}~\cite{o2003hybrid}~\cite{yu2005racetrack}~\cite{bond2010pacer}~\cite{marino2009literace}~\cite{flanagan2009fasttrack}~\cite{pozniansky2007multirace}, but only for user programs. It's faster than fully software emulated virtual machine such as Bochs, the high performance overhead still is the biggest concern.   
 
-DataCollider~\cite{erickson2010effective} leverage code breakpoint and data breakpoint in an innovative way to efficiently monitor data accesses. At runtime, it samples a small number of them for data-race detection by inserting code breakpoints at memory access instructions which is chosen randomly. When a code breakpoint fires, it sets a data breakpoint where the current thread is about to read/write to trap later access conflicts by other threads. It detects data races regarding the sampled memory within a small time window.
 
-However, data breakpoint is a limited resource on commercial processors. For example, on x86 architecture, it dependents on the debug registers (DRx), which limit the number of data-breakpoint up to 4. Thus, only a small number of program locations can be monitored at a time. It's sufficient for hunting data race bugs, especially for low sampling rates. But it's not enough to cover the whole system as a run-time protection.
+%\textbf{Transactional Memory}~\cite{herlihy1993transactional}~\cite{shavit1997software}~\cite{rajwar2012intel}~\cite{haring2012ibm}~\cite{jacobi2012transactional}~\cite{click2009azul}~\cite{dice2009early} attempts to simplify concurrent programming by allowing memory read and write instructions to be executed in an atomic way. Usually memory access transactions are short-lived activities only when accessing a small memory area, such as a shared counter or shared double-linked list. Since transactional memory is limited resource, it's not practical to cover large portion of code. 
+%
+%In order to cover large region of code, one way is to leverage the lightweight transaction mode of hardware-assistant transactional memory~\cite{gupta2009using}, the other is to use software transactional memory\cite{kestor2014trex}. Or combine both hardware and software method together~\cite{zhang2016txrace}. Those projects are mostly focusing bug hunting. To deploy those as mitigations, transaction primitives are needed to add to the source code either by programmers or compilers.
+%
+%The idea behind bug hunting projects is similar to ours, which is marking a conflict zone and then capturing conflicts. In our case, almost the whole life-span of a system call is marked as the conflict zone. Then hardware feather SMAP and page fault handling mechanism are leveraged to capture and handle conflicts.
+
+
+\textbf{\textit{Transactional Memory.}} As discussed in~\autoref{sec:ktoctou-background}, the root cause of kernel-level TOCTOU is that both kernel and user access the same memory address, which produce data inconsistency. Transactional memory~\cite{shavit1997software}~\cite{rajwar2012intel}~\cite{herlihy1993transactional} is a mechanism that allows a series of memory operations to execute atomically. It is an intuitive method for solving data inconsistency problems. Hardware transactional memory has become available on Intel processors since the Haswell macroarchitecture~\cite{rajwar2012intel}. However, even before the hardware transactional memory feature is widely available, researchers use software transactional memory~\cite{kestor2014trex}~\cite{abadi2008semantics} to detect race conditions. It is more of a static analysis based approach.
+
+
+With the hardware support, TxRace~\cite{zhang2016txrace} detects data race at run-time. It instruments a multithreaded program to transform synchronization-free regions into transactions and leverage the conflict detection mechanism of Intel Restricted Transactional Memory (RTM). However, the hardware's limitation is also apparent.  Intel RTM does not support arbitrarily long transactions, simply aborting any transactions exceeding the hardware buffer's capacity for transactional states. It can only run a short range of code and does not support a wide variety of processor mechanisms such as system calls, interruptions, special instructions (CPUID, MMX), IPI. Any of those and even access invalid memory may cause a transactional abort. Therefore, the hardware transactional memory is not suitable as run-time mitigation for kernel-level TOCOTU but a race condition detector. Although the idea of bug hunting is quite comparable to ours, similarly, we mark a whole system call as a transaction. Once we protect a user page during the system call, other user accesses cause the conflicts. 
+
+
+
+
+\textbf{\textit{Dynamic Binary Instrumentation.}}  It is a common method for monitoring a program's behavior. Tools such as Intel Pin~\cite{luk2005pin}, DynamoRIO~\cite{nethercote2007valgrind} injects instrucmentation stubs into the program. It is a technique that widely used in data race detectors~\cite{savage1997eraser}~\cite{o2003hybrid}~\cite{yu2005racetrack}~\cite{bond2010pacer}~\cite{marino2009literace}~\cite{flanagan2009fasttrack}~\cite{pozniansky2007multirace}. However dynamic binary instructation is only available for user-mode programs and the high performance overhead is the biggest limitation. 
+
+
+\textbf{\textit{Hardware data breakpoints.}} DataCollider~\cite{erickson2010effective} leverage software code breakpoints and hardware data breakpoints to efficiently detecting data races in kernel modules.  It randomly samples a small percentage of memory accesses as candidates for data-race detection. First, it uses static analysis to decide the sampling set, which are the instruction locations that access memory. Then it inserts code breakpoints, and when one code breakpoint fires, it uses a data breakpoint to trap the second access to detect conflicts. However, data breakpoint is a limited resource on commercial processors. An Intel processor usually has four hardware data breakpoints. Thus, it can only monitor a few program locations simultaneously. It is sufficient for hunting data race bugs, but not enough hardware resources for run-time kernel-level TOCTOU mitigation.
+
