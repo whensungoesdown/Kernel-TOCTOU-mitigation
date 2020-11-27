@@ -103,7 +103,7 @@ The hypervisor plays an essential role in developing and debugging for \name. Wh
 Due to Intel VT virtualization technology's design~\cite{neiger2006intel}, it is possible to load a light-weight hypervisor as a kernel module during run time. Unlike other commercial hypervisors such as Xen, Hyper-V, and VMWare, it does not emulate hardware devices. It merely put the operating system into VM guest mode, and itself becomes the hypervisor, thus monitors system events~\cite{howtohide}.
 
 \begin{figure}[th]
-  \includegraphics[width=0.40\textwidth]{figures/processmap3}
+  \includegraphics[width=0.47\textwidth]{figures/processmap4}
   \centering
   \caption{Operations on the CR3 register are the decisive characteristic of process context switching, which triggers VM exit by default. By setting the SMAP bit in the CR4 image of the VMCS.GuestArea, it updates the CPU CR4 when the hypervisor enters the virtual machine again. Therefore, it is possible to use the hypervisor to enable the SMAP feature when a specific process is running on the CPU.}
   \label{fig:processmap}
