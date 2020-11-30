@@ -3,56 +3,51 @@
 \section{Evaluation}
 \label{sec:ktoctou-evaluation}
 
-In this section, we evaluates performance overhead and how it protets  operating system from real-world vulnerabilities.
+In this section, we evaluate \name's performance overhead and how it protects the operating system from real-world vulnerabilities.
+
 
 \subsection{Performance}
-In this section, we focus on performance evaluation. 
-As formerly mentioned, this project has two major parts, the hypervisor, and the exception handler. To accurately presents the performance impact that introduced by this mitigation. We conduct the tests in three parts.
+In this section, we focus on performance evaluation.
+As previously mentioned, \name has two key components, the system module and the hypervisor. To present the performance impact introduced by this mitigation, we conduct the tests in three parts. 
 
-Firstly, the hypervisor plays an essential part in this project. Without it, the SMAP exception would happen within any context, even in the path of handling the previous case. Nowadays, a hypervisor is part of the infrastructure of cloud computing. Even the Windows 10 operating system brings its native hypervisor to achieve security goals.  Therefore, in those scenarios,  the performance overhead introduced by the hypervisor pre-existed. 
+All tests run on the PC with Intel Core I5-6400 (6 GEN CPU Skylake), ASUS H110M-C motherboard (Intel H110 Chipset, Realtek RTL8111H Network Controller), 8GB RAM, and 500GB hard disk.
 
-In this part, we use the well-known benchmark SPEC 2006. We understand that this benchmark is for instruction evaluation, specifically for microarchitectural aspects, such as instruction execution, branch prediction accuracy, cache policies. We choose several programs from the set, all without GUI and computational intensive comparing to the fewer system calls. Therefore the performance overhead incurred is mainly from the hypervisor.
+\textbf{textit{Benchmarks.}} The hypervisor plays an essential part in \name. Without the hypervisor confining the SMAP feature, it would not be possible to debug a complex system like Windows with a system-wide unsupported feature. Nowadays, a hypervisor is part of the cloud computing infrastructure and can be regarded as a built-in component. The Windows 10 operating system even brings its native hypervisor to deliver security goals. Under those circumstances, \name can be added to the existing hypervisor with less performance overhead imposed on the system. 
 
-We compare our hypervisor with vanilla OS and the native Windows 10 hypervisor used for code integrity purposes. We are not trying to compete with HVCI (Windows 10 native hypervisor) because the two hypervisors serve different objectives. But to show at what level, the end-user may accept a hypervisor by default.
-
-
-All tests run on the PC: Intel Core I5-6400 (6 GEN CPU Skylake), ASUS H110M-C mother board(Intel H110 Chipset, Realtek RTL8111H Network Controller), 8GB RAM and 500GB hard disk.
-
+To evaluate the hypervisor's performance overhead, we use the well-known benchmark SPEC 2006. We understand that this benchmark is for processor instruction evaluation, specifically for microarchitectural aspects, such as instruction execution, branch prediction accuracy, cache policies. We choose several programs from the set. They are all non-GUI and computational intensive programs. Therefore the performance overhead incurred is primarily due to the hypervisor. Although our hypervisor and Windows HVCI have different objectives, we compare them to show that run-time protection utilizes virtualization techniques is practical.
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/benchmark3}
   \centering
   \caption{Performance overhead on the SPEC benchmarks incurred by the run-time load hypervisor. HVCI represent the Windows 10 native hypervisor for Hypervisor-Protected Code Integrity. All overheads are normalized to the unprotected system running benchmark.}
-  \label{fig:benchmark}
+  \label{fig:ktoctou-benchmark}
 \end{figure}
 
-As shown in~\autoref{fig:benchmark}, the performance overhead of hypervisor alone is acceptable, on average, 3.25\%. HVCI yields a modest performance overhead of 0.81\%.
+
+\autoref{fig:ktoctou-benchmark} shows that hypervisor's performance overhead is acceptable, on average, 3.25\%. HVCI yields a modest performance overhead of 0.81\%.
 
 % show my respect.. maybe remove it later
-Our hypervisor is slower than HVCI, particularly in two benchmark programs. Learning more about computer architecture and virtualization techniques, we wish to improve our hypervisor to achieve the same performance.
 
-We chose several non-trivial applications to demonstrate the performance overhead introduced by our mitigation. Systematic mitigation is difficult, especially for an operating system as complicated as Windows. Those ones run long enough to make the tests possible.
+Our hypervisor is slower than HVCI, particularly in two benchmark programs. Learning more about computer architecture and virtualization techniques, we wish to improve our hypervisor to perform better.
+
+
+
+\textbf{\textit{Non-trivial Applications.}} We also evaluate \name on several non-trivial applications, as shown in~\autoref{fig:ktoctou-performance}. The applications we choose are meaningful because the kernel-TOCTOU vulnerability may threaten them. For example, a web server such as Nginx normally runs in a non-root account and takes external requests. 
+
+To test web servers, we count their response time for a web request. For compression software, the test is to compress large files. We also use speedtest1.c, which is a performance testing program for sqlite3. The result shows that the performance overhead is acceptable. 
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/performance4}
   \centering
-  \caption{Performance overhead in non-trivial applications. Overhead mostly being introduced on system calls that need to fetch user-mode parameters}
+  \caption{Performance overhead in non-trivial applications. Overhead mostly being introduced on system calls that need to fetch user parameters}
   \label{fig:ktoctou-performance}
 \end{figure}
 
-~\autoref{fig:ktoctou-performance} shows the performance overhead of our mitigation in several non-trivial application. Some of those applications potentially could be the trampoline service of kernel TOCTOU attacks.
-For web server software such as Nginx. We test its performance by counting the accumulated response time for 10000 web requests. For compression software such as zlib, we test it with compressing large files. For sqlite3, we use speedtest1.c which is a common performance testing program.
-
-The result shows that the performance overhead is acceptable. Because only the system calls that have user-mode buffer as their parameters will trigger SMAP exceptions. 
 
 
 
-Based on our investigation through reverse-engineering and monitoring, we find that the Windows kernel's graphical module, namely, win32k.sys, has the most TOCTOU issue. Due to the nature of how the GUI subsystem drawing screen, the number of win32k system calls is tremendous, even for a simple program such as Windows notepad. The GUI system calls frequently reference user-mode variables. Some of the cases fall into the kernel TOCTOU category; the others are benign. We believe that the situation will be eased with the improvement of the new Windows kernel. Because of the formerly mentioned two causes, our mitigation incurs an unneglectable performance overhead when applied to GUI programs. If the GUI window minimized, the screen drawing related system calls are stopped, but the rest is still in service. This is the case for most server services.
 
-
-To measure the number of system calls, we drag the GUI program's window around to let the system redraw the screen. For the server programs, the results depend on the requests it served. We send a URL request for the default page every second. 
-
-We take 500 system calls as the standard to measure the following: how many pages touched and protected, how much time does the program took, and how many double fetches happened.
+\textbf{\textit{GUI.}} Through our investigation, we find that the Windows graphical subsystem, namely, Win32k.sys, has the most double-fetch issues.  Because GUI programs need to redraw their graphical components frequently, they invoke the win32k system calls a lot, even for a simple program such as Windows notepad. Therefore,  our mitigation incurs an unneglectable performance over GUI programs. The overhead is primarily affected by how often the interface is refreshed. For example, if minimizing a GUI program's window, its performance will not be slow down by the graphical interface at all. We compare GUI programs with non-GUI programs in the following aspects: the number of user pages accessed by kernel per system call and how many double fetches occur. We drag the GUI program's window to trigger redraw, and we send one URL request to the web servers per second. The measurement takes the first 500 system calls.
 
 \begin{center}
 \begin{table}[ht]
@@ -81,55 +76,12 @@ We take 500 system calls as the standard to measure the following: how many page
 \end{table}
 \end{center}
 
-%\begin{center}
-%\begin{table}[ht]
-%	\small
-%	%\renewcommand{\arraystretch}{1.3}
-%	\caption{System call count and user-pages accessed for GUI \& non-GUI programs }
-%	\label{table:pages}
-%	\centering
-%	\begin{tabular}{>{\centering\arraybackslash}m{1.35cm}|
-%		        >{\centering\arraybackslash}m{1.1cm}|c|c|
-%		 	>{\centering\arraybackslash}m{1.1cm}|
-%			>{\centering\arraybackslash}m{0.92cm} } 
-%		\hline
-%		Programs & System Calls & Pages & \textbf{avg.} & Double Fetch & Time (ms)\\ 
-%		\hline
-%		nginx & 500 & 711 & 1.42 & \textbf{223} &12312\\ 
-%		apache & 500 & 689 & 1.38 & \textbf{205} &11339\\ 
-%		notepad & 500 & 1434 & 2.87 & \textbf{1373} & 1859 \\ 
-%		freecell & 500 & 1352 & 2.70 & \textbf{1266} & 1500 \\ 
-%		\hline
-%	\end{tabular}
-%\end{table}
-%\end{center}
 
-As shown in~\autoref{table:pages}, even without any explicit interactive operation, refreshing the GUI takes tremendous system calls. Services such as Nginx only have few system calls when idle. On average,  the win32k system call accesses more user pages than the kennel system call does. One reason is that other than "capturing" the user-supplied parameter at the beginning of a system call, win32k read/writes user variables even during the system call. 
+\autoref{table:pages} shows some interesting results. Refreshing the GUI takes tremendous system calls. As expected, both the kernel and the Win32k subsystem accesses user pages, but the win32k accesses more than the kernel. They both \textit{capture} the user parameters at each system call, but the win32k module read/write more user data even in the middle of a system call.
 
 
-
-% use this with the previous table with Protected Page(r,w)
-Among those pages, we also record the access type, either read or write. It is the type of which the kernel first accesses a user page, triggering a SMAP exception. We notice that the number of write-access pages is zero for non-GUI programs. It appears that the kernel does not directly write user pages, which is false. The reasons are the following.  The operating system provides the three methods for accessing data buffers: Buffered I/O, Direct I/O, and Neither Buffered Nor Direct I/O.
-
-Buffered I/O and Neither I/O can copy or write to a user buffer, but Direct I/O is the most common way to transfer amounts of data. The operating system locks the application's buffer in memory. It then
-creates a memory descriptor list (MDL) that identifies the locked memory pages and passes the MDL to the driver stack. Drivers access the locked pages through the MDL.
-
-However, the system still needs to fill in some parameters directly, such as a word-size handle from the system call ZwCreateFile. As described earlier, the kernel calls ProbeForWrite inside a try-catch block.
-
-For example, the code for validating the file handle parameter is similar to the following, in~\autoref{fig:probecode}.
-
-
-%\begin{lstlisting}[style=code, caption={Pseudo-code of kernel validating a user-supplied variable. } \label{lst:probeforwrite}, captionpos=b]
-%try {
-%	...
-%	*((volatile HANDLE *)Address) = *Address;
-%
-%} except(EXCEPTION_EXECUTE_HANDLER) {
-%
-%	// Error handling
-%	return GetExceptionCode();
-%}
-%\end{lstlisting}
+We also count the number of reads and writes on user pages. For non-GUI programs, the number of writes is zero, which is strange because most system calls need to write results back to the user program. With investigation, the causes are as follows. Windows provides three methods to transfer data between system calls and user programs, namely, Buffered I/O, Direct I/O, and Neither Buffered Nor Direct I/O. Among the three, the kernel mostly uses Buffer I/O and Direct I/O, which do not need to write to user-mode buffer directly. However, the kernel still needs to write user-mode variable such as the filehandle in system call \texttt{NtCreateFile}.
+~\autoref{fig:probecode} shows the pseudo-code similar to what the kernel uses to validate user parameters. We can see that the code always reads the variable first and the SMAP exception only captures first access. Therefore, this coding style is another cause for the zero writes. The results show the kernel is well regulated on accessing user data. On the other side, the Win32k module has many writes, which tell a different story.
 
 
 \begin{figure}[th]
@@ -139,7 +91,6 @@ For example, the code for validating the file handle parameter is similar to the
   \label{fig:probecode}
 \end{figure}
 
-We can see that the assembly code generated always reads the variable before writing it. This coding style is another cause for the zero write access. 
 
 
 % for later reference
@@ -155,34 +106,10 @@ We can see that the assembly code generated always reads the variable before wri
 
 
 
-The column "Double Fetch" shows the user-addresses that are read over twice during a system call. We trace this information with an alternative project. It shows the win32k has more cases than the kernel. These potentially are double-fetch candidates. There exist duplicate records, and a significant proportion of the target addresses are within Process Environment Block (PEB) or Thread Environment Block (TEB) pages.  The selected logs we give in~\autoref{table:doubleread} are during various system calls.  Every two rows show that a potential subsequent instruction revisits the same user address shortly after. From the Cr3 and Teb values, it is the same thread of the same process. We observe that some instances fall under this category are direct access, even without a try-catch block. This finding also proves the necessity of such run-time mitigation for kernel TOCTOU vulnerability.
 
+The column \textit{Double Fetch} shows the user-addresses that are read more than once during individual system calls. We trace this information with the fuzzing tool as previously introduced in~\autoref{sec:ktoctou-experiment}. Many of those double-fetch records are duplicates and benign. The kernel needs to read data from Process Environment Block (PEB) or Thread Environment Block (TEB), data structures located in userspace.  However, the Win32k module has many more cases. ~\autoref{table:doubleread} gives a glimpse of them. Every two rows indicate a double-fetch case, where after the first read, the subsequent instruction revisits the same address shortly after, and the identical CR3 and TEB show that two fetches are from the same thread of the same process.
 
-%\begin{center}
-%\begin{table}
-%	\renewcommand{\arraystretch}{1.3}
-%	\caption{Some of the double-fetch results. }
-%	\label{table:doubleread}
-%	\centering
-%	\begin{tabular}{ l } 
-%		\hline
-%		Results: \\
-%		\hline
-%		CR3 0x6d40320 EIP 0xbf812de4 Addr 0x4808c4 TEB 0x7ffdd000 \\
-%		CR3 0x6d40320 EIP 0xbf812e4b Addr 0x4808c4 TEB 0x7ffdd000 \\
-%		\hline
-%		CR3 0x6d40320 EIP 0xbf812dea Addr 0x4808c8 TEB 0x7ffdd000 \\
-%		CR3 0x6d40320 EIP 0xbf812e55 Addr 0x4808c8 TEB 0x7ffdd000 \\
-%		\hline
-%		CR3 0x6d40320 EIP 0xbf812daf Addr 0x480750 TEB 0x7ffdd000 \\
-%		CR3 0x6d40320 EIP 0xbf812e21 Addr 0x480750 TEB 0x7ffdd000 \\
-%		\hline
-%		CR3 0x6d40320 EIP 0xbf80c04d Addr 0x7ffdd206 TEB 0x7ffdd000 \\
-%		CR3 0x6d40320 EIP 0xbf812ebe Addr 0x7ffdd206 TEB 0x7ffdd000 \\
-%		\hline
-%	\end{tabular}
-%\end{table}
-%\end{center}
+Furthermore, with reverse-engineering effort, we find that in some of those cases, the Win32k module directly read the user variable and without the protection of a try-catch block. It is dangerous. The user programs can free the user memory and cause the kernel code to access an invalid page without protection, which leads to a crash.
 
 
 \begin{center}
