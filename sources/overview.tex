@@ -49,6 +49,6 @@ We develop a light-weight hypervisor to confine the SMAP feature into specific p
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/ktoctou-overview2}
   \centering
-  \caption{The hypervisor is capable of confining the system-wide feature SMAP into one process. The processor raises page fault exception when the kernel accesses userspace so that we can protect those pages. Other user threads can read a protected page but can not write. The write will raise another page fault exception, where the page fault handler will block the write instruction until the system call ends.}
+  \caption{The hypervisor is capable of confining the system-wide feature SMAP into one process. When the hypervisor catches the process context switch events, it changes the SMAP enable bit in the CR4 register to only set during the target process. The processor raises page fault exception when the kernel accesses userspace so that we can protect those pages. Thread 1 can read a protected page but can not write. The read is allowed by automatically setting the protected page back to userspace with a read-only permit. However, when the write instruction raises an exception, the page fault handler suspends the thread until the system call ends.}
   \label{fig:ktoctou-overview}
 \end{figure}

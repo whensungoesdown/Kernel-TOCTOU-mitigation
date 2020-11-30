@@ -109,8 +109,7 @@ We also count the number of reads and writes on user pages. For non-GUI programs
 
 The column \textit{Double Fetch} shows the user-addresses that are read more than once during individual system calls. We trace this information with the fuzzing tool as previously introduced in~\autoref{sec:ktoctou-experiment}. Many of those double-fetch records are duplicates and benign. The kernel needs to read data from Process Environment Block (PEB) or Thread Environment Block (TEB), data structures located in userspace.  However, the Win32k module has many more cases. ~\autoref{table:doubleread} gives a glimpse of them. Every two rows indicate a double-fetch case, where after the first read, the subsequent instruction revisits the same address shortly after, and the identical CR3 and TEB show that two fetches are from the same thread of the same process.
 
-Furthermore, with reverse-engineering effort, we find that in some of those cases, the Win32k module directly read the user variable and without the protection of a try-catch block. It is dangerous. The user programs can free the user memory and cause the kernel code to access an invalid page without protection, which leads to a crash.
-
+Furthermore, with reverse-engineering effort, we find that the Win32k module directly read the user variable and without the protection of a try-catch block in some of those cases. It is dangerous. The user programs can free the user memory and cause the kernel code to access an invalid page without protection, which leads to a crash.
 
 \begin{center}
 	\begin{table}[ht]
