@@ -152,7 +152,6 @@ Considering the kernel is fully aware of the untrustworthy user-supplied paramet
 
 \subsection{Case Study}
 
-%We test it on the Windows XP sp3 system with the vulnerable win32k.sys file whose version is 5.1.2600.5512. Because SMAP only available at Intel 5th generation CPU (architecture code name Broadwell). Hard-disk controller which integrated in the CPU corresponded chipset doesn't support ATA mode anymore, and Windows XP system doesn't support AHCI mode, so it's difficult to install it on a modern PC. Our testing environment is established using a virtual machine. Particularly, VMWare Workstation 14 Player, emulated "Intel Core i5-6200U CPU (2 cores) with 1GB of RAM", option "Virtualize Intel VT-x/EPT or AMD-v/RVI" also enabled.
 
 \textbf{\textit{CVE-2008-2252}} is a bug reported by Thomas Garnier in 2008 and fixed by Microsoft as part of the MS08-061 security bulletin.  It is a typical TOCTOU vulnerability addressed in many previous research works~\cite{serna2008ms08}~\cite{wang2019dftracker}~\cite{jurczyk2013identifying}. To evaluate the effectiveness of our mitigation, we want to test it on a real hardware machine. SMAP and SMEP are only available on a relatively new processor, Intel 5 generation CPU (architecture code name Broadwell). It is troublesome to install the Windows XP operating system on a modern PC. The chipset with an integrated hard disk controller no longer supports IDE mode, and Windows XP does not support the advanced host controller interface (AHCI) either. For us, we need an additional AHCI driver for Windows XP and a tool to virtualize a floppy drive~\cite{installxpskylake} to provide it during the installation.
 
@@ -160,40 +159,24 @@ We write a proof-of-concept (POC) program to exploit the CVE-2008-2252 vulnerabi
 
 
 
-The exploit creates two threads. One thread first allocates a virtual page at address 0 then use it as the parameter for the vulnerable system call. Using page zero is a necessity to bypass the sanity check of the system call NtUserMessageCall(). Then, it repeatedly calls the upper layer vulnerable Win32 API \texttt{SendMessage()} (\texttt{WM\_COPYDATA}) with the malicious parameters. \texttt{SendMessage()} calls a lower layer function \texttt{NtUserMessageCall()}, which eventually calls the vulnerable win32k internal function \texttt{xxxInterSendMsgEx()}. The other thread keeps flipping the key variable on page zero simultaneously.
+The exploit creates two threads. Thread 0 first allocates a virtual page at address 0 then uses it as the parameter for the vulnerable system call. Using page zero is a necessity to bypass the sanity check of the system call NtUserMessageCall(). Then, it repeatedly calls the upper layer vulnerable Win32 API \texttt{SendMessage()} (\texttt{WM\_COPYDATA}) with the malicious parameters. \texttt{SendMessage()} calls a lower layer function \texttt{NtUserMessageCall()}, which eventually calls the vulnerable win32k internal function \texttt{xxxInterSendMsgEx()}. Meantime, thread 1 keeps flipping the key variable on page zero simultaneously.
+
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/ms08061case2}
   \centering
-  \caption{The attack thread tries to flip the data within the attack window, between instruction \texttt{\textcircled{2}} and \texttt{\textcircled{3}}. The kernel first touches the page at instruction \texttt{\textcircled{1}}, then the mitigation protects it afterward until the end of the current system call, creating the larger page-protect-window. As soon as the attack thread writes the protected page, the page fault handler suspends it until the protection ends.}
+  \caption{The attack thread tries to flip the data within the attack window, between instruction \texttt{\textcircled{2}} and \texttt{\textcircled{3}}. The kernel first touches the page at instruction \texttt{\textcircled{1}}, then the mitigation protects it afterward until the end of the current system call, creating a larger page-protect-window. As soon as the attack thread writes the protected page, the page fault handler suspends it until the protection ends.}
   \label{fig:ms08061case}
 \end{figure}
 
-%In the attack, as shown in ~\autoref{fig:ms08061case}, the \textcircled{2} and \texttt{\textcircled{3}} are the places where vulnerable user-mode variable pcbData are referenced, it's address is 0x4. But the first time the zero page get accessed is \textcircled{1} where several instruction ahead of \textcircled{2}, it triggers an page fault exception (cased by SMAP). Therefore this page will be marked as a kernel page by our page fault handler. From this moment until the end of the current system call, this page will be protected from modifying by either as a kernel page or a user page with read-only permit. If the attacking thread try to modified it, another page fault exception  will be raised because of access violation. Then the attacking thread will be held for 30 milliseconds before it try to re-execute the faulting instruction again, for as many as 10 times. If not possible, the attacking thread will be terminated. We can see that during the protection, memory reads at \textcircled{2} and \textcircled{3} are kept consistent.
 
-As shown in~\autoref{fig:ms08061case}, the kernel reads the user-mode variable at address 0x4 twice at \texttt{\textcircled{2}} and \texttt{\textcircled{3}}. Any data changes during this time will cause data inconsistency in the kernel. Therefore it is the time window for the attack. The attack thread tries to enlarge the value read at \texttt{\textcircled{3}}. Our protection needs to cover the entire attack time window so that the attack thread can not change the user-mode variable during it. In this case, at \texttt{\textcircled{1}}, several instructions before \texttt{\textcircled{3}}, the CMP instruction operating on page zero, causes a SMAP exception. Our page fault handler sets page zero to kernel-mode until the current system call, that is, NtUserMessageCall(), ends. This period covers the entire attack time window. Once the attack thread tries to write the protected page, it will raise a page fault exception, and our page fault handler will suspend the current thread, waiting for the release of the page.
-
-
-%\textbf{\textit{CVE-2013-1254}} is another typical TOCTOU vulnerability that found in Windows win32k module~\cite{jurczyk2013identifying}. It effects both Windows XP and Windows 7. 
-
-%A series of same kind of vulnerability found in 26 functions of module win32k.
+As shown in~\autoref{fig:ms08061case}, the kernel reads the user-mode variable at address 0x4 twice at \texttt{\textcircled{2}} and \texttt{\textcircled{3}}. Any data changes during this time will cause data inconsistency in the kernel. Therefore it is the time window for the attack. The attack thread tries to enlarge the value read at \texttt{\textcircled{3}}. Our protection needs to cover the entire attack time window so that the attack thread can not change the variable during it. In this case, at \texttt{\textcircled{1}}, several instructions before \texttt{\textcircled{3}}, the CMP instruction operates on page zero, raising a SMAP exception. Our page fault handler sets this page to kernel-mode until the current \texttt{NtUserMessageCall()} ends, which covers the entire attack time window. When thread 1 tries to write the protected page, it raises a page fault exception, and our page fault handler suspends the thread, waiting for the release of the page.
 
 
-CVE-2013-1254. Similar to the one above mentioned, CVE-2013-1254 is another typical TOCTOU vulnerability. It is a family of 27 distinct vulnerabilities~\cite{ms13016}~\cite{jurczyk2013identifying} in the win32k module. It affects a variety of operating systems from Windows XP to Windows Server 2012.
 
-%\begin{lstlisting}[style=code] 
-%.text:BF8A993F   mov   eax, _W32UserProbeAddr
-%                       .
-%                       .
-%.text:BF8A9973   @cmp   [ecx+8], eax@    
-%.text:BF8A9976   jnb   short loc_BF8A997B
-%.text:BF8A9978   @mov   eax, [ecx+8]@    
-%.text:BF8A997B
-%.text:BF8A997B loc_BF8A997B:                           
-%.text:BF8A997B   mov   ecx, [eax]
-%.text:BF8A997D   mov   eax, [eax+4]
-%\end{lstlisting}
-%%\captionof{lstlisting}{Flawed code in win32k.sys function SfnINOUTSTYLECHANGE()}
+
+\textbf{\textit{CVE-2013-1254.}} Similar to the one above mentioned, CVE-2013-1254 is another typical TOCTOU vulnerability. It is a family of 27 distinct vulnerabilities~\cite{ms13016}~\cite{jurczyk2013identifying} in the win32k module. It affects a variety of operating systems from Windows XP to Windows Server 2012.
+
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/cve-2013-1254}
@@ -203,9 +186,8 @@ CVE-2013-1254. Similar to the one above mentioned, CVE-2013-1254 is another typi
 \end{figure}
 
 
+They have the same patterns. The code is mostly around the \texttt{\_W32UserProbeAddress}, which is a value that indicates the highest possible address for user-mode variables. ~\autoref{fig:cve-2013-1254}shows that the flawed code in red first gets the value from \texttt{ecx+8} and compare it with \texttt{\_W32UserProbeAddress}; afterward, it gets the data again to \texttt{eax}, which is the second fetch. An attacker can abuse this, changing the value to bypass the parameter sanity check, for example, send in a kernel-mode address.
 
 
-They have the same patterns. The code is mostly around the \texttt{\_W32UserProbeAddress}, which is a value that indicates the highest possible address for user-mode variables. As shown in~\autoref{fig:cve-2013-1254}, the flawed code in red first gets the value from \texttt{ecx+8} and compare it with \texttt{\_W32UserProbeAddress}. Afterward, it gets the data again to eax, which is the second fetch. The attacker can abuse this, changing the value to bypass the parameter sanity check, for example, send in a kernel-mode address. 
+When the instruction \texttt{cmp [ecx+8], eax} triggers the SMAP exception, our mitigation protects this page until the current system call ends. Therefore, the kernel gets the same data at the second fetch.
 
-
-Therefore, when the instruction \texttt{cmp [ecx+8]}, eax triggers the SMAP exception, our mitigation protects this page until the current system call ends.
