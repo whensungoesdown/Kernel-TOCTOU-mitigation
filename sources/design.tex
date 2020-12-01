@@ -27,7 +27,7 @@ back to userspace, allowing user threads to read. When user threads read a kerne
 
 
 \begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/pagestate4}
+  \includegraphics[width=0.47\textwidth]{figures/pagestate6}
   \centering
   \caption{Page attributes transits in different states. A user page becomes a kernel page when the kernel read/write it~\texttt{\textcircled{1}}. Afterward, if user threads read this page, our page fault handler changes it back to user-mode with a read-only permit~\texttt{\textcircled{2}}. This page is again capable of triggering a SMAP exception if the kernel reaccesses it~\texttt{\textcircled{3}}. Our page handler suspends any user thread that tries to write a protected page~\texttt{\textcircled{4}}. It then calls a sleep function, letting the operating system, and wakes up periodically to check the page's status~\texttt{\textcircled{5}}. When the current system call ends, this page is restored to user-mode with its original permits~\texttt{\textcircled{6}}. The write thread is also released and re-execute the faulting instruction to write the page~\texttt{\textcircled{7}}. However, if the thread waits too long, it will be terminated to avoid a deadlock~\texttt{\textcircled{8}}.}
   \label{fig:pagestate}
