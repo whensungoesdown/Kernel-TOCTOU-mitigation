@@ -10,7 +10,7 @@ This paper focuses on kernel-level TOCTOU vulnerabilities and their mitigation. 
 
 Through studying the real-world vulnerability cases,  we find that kernel-level TOCTOU vulnerability widely exists in the operating systems, especially Microsoft Windows. Notably, a graphical subsystem kernel module tightly coupled with user-mode libraries freely access user-mode data structures, among which double fetches on the same variable is not unusual. In essence, the kernel repeatedly reads the same user-mode memory address within a short period, within the same system call.
 
-To find the bugs with the typical memory-access pattern, we develop a fuzzing tool that leverages an Intel CPU feature, Supervisor Mode Access Prevention (SMAP), and combined with a run-time hypervisor to monitor the Windows kernel swiftly. SMAP is a feature, since the Intel Broadwell microarchitecture, that prevents the kernel from freely accessing userspace so that such access will raise an exception. It accurately serves the purpose of notifying us when the kernel access a user-mode address. For each system call, we pick out those user-mode addresses that the kernel reads twice, which are the candidates for further analysis. Following we contacted Microsoft for our findings.
+To find the bugs with the typical memory-access pattern, we develop a fuzzing tool that leverages an Intel processor feature, Supervisor Mode Access Prevention (SMAP), and combined with a run-time hypervisor to monitor the Windows kernel swiftly. SMAP is a feature, since the Intel Broadwell microarchitecture, that prevents the kernel from freely accessing userspace so that such access will raise an exception. It accurately serves the purpose of notifying us when the kernel access a user-mode address. For each system call, we pick out those user-mode addresses that the kernel reads twice, which are the candidates for further analysis. Following we contacted Microsoft for our findings.
 
 Furthermore, we present \name, the first run-time protection for kernel-level TOCTOU vulnerabilities, to the best of our knowledge. It also leverages the same hardware feature SMAP and the hypervisor. Base on our observation on the vulnerability, to retain the virtual memory that the kernel fetched unwritable is the key to successful protection. Considering hardware capability and practical aspects, we propose the following idea. Whenever the kernel accesses a user-mode memory, \name protects the corresponding page by setting it as a kernel page until the current system call ends so that no other user threads can tamper with it. We also solve the practical issue that benign read and write access to the data that resides on the protected page.
 
@@ -23,7 +23,7 @@ Due to the Windows system's complex nature and the fact that it did not adopt SM
 \begin{itemize}[leftmargin=*]
     \item We identify kernel TOCTOU vulnerability using study cases, and demonstrated with practical exploits against them. 
     \item We present \name, a novel run-time mitigation framework leveraging hardware feature (SMAP). 
-    \item We propose a configurable light-weight hypervisor to isolate system-wide CPU features.
+    \item We propose a configurable light-weight hypervisor to isolate system-wide processor features.
     \item We develop a fuzzing tool for detecting kernel TOCTOU vulnerabilities.
     \item We have implemented \name and evaluated it with a number of benchmark programs with real-word vulnerabilities.
   

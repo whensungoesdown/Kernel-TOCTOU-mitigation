@@ -1,111 +1,119 @@
-@article {double-fetch-linux,
-author = {Pengfei Wang and Jens Krinke and Kai Lu and Gen Li and Steve Dodier-Lazaro},
-title = {How Double-Fetch Situations turn into Double-Fetch Vulnerabilities: A Study of Double Fetches in the Linux Kernel},
-booktitle = {26th {USENIX} Security Symposium ({USENIX} Security 17)},
-year = {2017},
-address = {Vancouver, BC},
-url = {https://www.usenix.org/conference/usenixsecurity17/technical-sessions/presentation/wang-pengfei},
-publisher = {{USENIX} Association},
+@inproceedings {double-fetch-linux,
+	author = {Pengfei Wang and Jens Krinke and Kai Lu and Gen Li and Steve Dodier-Lazaro},
+	title = {{How Double-Fetch Situations turn into Double-Fetch Vulnerabilities: A Study of Double Fetches in the Linux Kernel}},
+	booktitle = {26th {USENIX} Security Symposium ({USENIX} Security 17)},
+	year = {2017},
+	address = {Vancouver, BC},
+	url = {https://www.usenix.org/conference/usenixsecurity17/technical-sessions/presentation/wang-pengfei},
+	publisher = {{USENIX} Association},
 }
 
-@misc{intelpaging,
-  title={Chapter 4, "Paging" in the Intel 64 and IA-32 Architectures Software Developer's
-Manual, Volume 3A},
-  author={Intel Manual},
-  year={2017}
+@inproceedings{intelpaging,
+	title={{Chapter 4 PAGING}},
+	author={Intel},
+	booktitle = {Intel 64 and IA-32 Architectures Software Developer's Manual, Volume 3A: System Programming Guide},
+	year={2020}
 }
 
 
-@misc{intelinterrupt,
-  title={{Chapter 6, "INTERRUPT AND EXCEPTION HANDLING" in the Intel 64 and IA-32 Architectures Software Developer's
-Manual, Volume 3A}},
-  author={Intel Manual},
-  year={2020}
+@inproceedings{intelinterrupt,
+	title={{Chapter 6 INTERRUPT AND EXCEPTION HANDLING}},
+	author={Intel},
+	booktitle = {Intel 64 and IA-32 Architectures Software Developer's Manual, Volume 3A: System Programming Guide},
+	year={2020}
 }
 
-@misc{intelapic,
-  title={{Chapter 10, "ADVANCED PROGRAMMABLE INTERRUPT CONTROLLER (APIC)" in the Intel 64 and IA-32 Architectures Software Developer's
-Manual, Volume 3A}},
-  author={Intel Manual},
-  year={2020}
+@inproceedings{intelapic,
+	title={{Chapter 10 ADVANCED PROGRAMMABLE INTERRUPT CONTROLLER (APIC)}},
+	author={Intel},
+	booktitle = {Intel 64 and IA-32 Architectures Software Developer's Manual, Volume 3A: System Programming Guide},
+	year={2020}
 }
 
-@misc{amdapic,
-  title={{Chapter 16, "Advanced Programmable Interrupt Controller (APIC)" in the AMD 64 Architecture Programmer's Manual Volume 2: System Programming}},
-  author={AMD Manual},
-  year={2020}
+@inproceedings{amdapic,
+	title={{Chapter 16 Advanced Programmable Interrupt Controller (APIC)}},
+	booktitle={{AMD 64 Architecture Programmer's Manual Volume 2: System Programming}},
+	author={AMD Manual},
+	year={2020}
 }
 @misc{intelprotectedmode,
-  title={Chapter 3, "PROTECTED-MODE MEMORY MANAGEMENT" in the Intel 64 and IA-32 Architectures Software Developer's
-Manual, Volume 3A},
-  author={Intel Manual},
-  year={2017}
+	title={{Chapter 3 PROTECTED-MODE MEMORY MANAGEMENT}},
+	booktitle = {Intel 64 and IA-32 Architectures Software Developer's Manual, Volume 3A: System Programming Guide},
+	author={Intel},
+	year={2017}
 }
 
 @misc{jurczyk2013identifying,
-  title={Identifying and exploiting windows kernel race conditions via memory access patterns},
-  author={Jurczyk, Mateusz and Coldwind, Gynvael and others},
-  year={2013}
+	title={{Identifying and Exploiting Windows Kernel Race Conditions via Memory Access Patterns}},
+	author={Jurczyk, Mateusz and Coldwind, Gynvael and others},
+	year={2013}
 }
 
 
 @misc{ms08061,
-  title={MS08-061 : The case of the kernel mode double-fetch},
-  author={swiat},
-  year={2008}
+	title={{MS08-061: The Case of the Kernel Mode Double-Fetch; available at \url{https://msrc-blog.microsoft.com/2008/10/14/ms08-061-the-case-of-the-kernel-mode-double-fetch}}},
+	author={Serna, Fermin J},
+	year={2008}
 }
 
 @misc{probeforread,
-  title={{ProbeForRead Routine}},
-  author={MSDN},
-  year={2017},
-  url={https://msdn.microsoft.com/en-us/library/windows/hardware/ff559876(v=vs.85).aspx}
+	title={{ProbeForRead Routine; available at \url{https://msdn.microsoft.com}}},
+	author={Microsoft},
+	year={2017},
+	url={https://msdn.microsoft.com/en-us/library/windows/hardware/ff559876(v=vs.85).aspx}
 }
 
 
 @article {CVE-2016-3219,
-title = {Windows: Custom Font Disable Policy Bypass},
-year = {2016},
-url = {https://bugs.chromium.org/p/project-zero/issues/detail?id=779},
+	title = {{Windows: Custom Font Disable Policy Bypass; available at \url{https://bugs.chromium.org/p/project-zero/issues/detail?id=779}}},
+	author={Forshaw},
+	year = {2016},
+	url = {https://bugs.chromium.org/p/project-zero/issues/detail?id=779},
 }
 
 
 @article {CVE-2016-3258,
-title = {CVE-2016-3258},
-year = {2016},
-url = {http://www.cvedetails.com/cve/CVE-2016-3258/},
+	title = {{CVE-2016-3258; available at \url{http://www.cvedetails.com/cve/CVE-2016-3258}}},
+	author = {CVE},
+	year = {2016},
+	url = {http://www.cvedetails.com/cve/CVE-2016-3258/},
 }
 
 @article {CVE-2013-1278,
-title = {CVE-2013-1278},
-year = {2013},
-url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1278},
+	title = {{CVE-2013-1278; available at \url{http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1278}}},
+	author = {CVE},
+	year = {2013},
+	url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1278},
 }
 
 @article {CVE-2013-1277,
-title = {CVE-2013-1277},
-year = {2013},
-url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1277},
+	title = {{CVE-2013-1277; available at \url{http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1277}}},
+	author = {CVE},
+	year = {2013},
+	url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1277},
 }
 
 @article {CVE-2013-1254,
-title = {CVE-2013-1254},
-year = {2013},
-url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1254},
+	title = {{CVE-2013-1254; available at \url{http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1254}}},
+	author = {CVE},
+	year = {2013},
+	url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1254},
 }
 
 
 @article {CVE-2013-1250,
-title = {CVE-2013-1250},
-year = {2013},
-url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1250},
+	title = {{CVE-2013-1250; available at \url{http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1250}}},
+	author = {CVE},
+	year = {2013},
+	url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1250},
 }
 
 
 @article {CVE-2013-1248,
-title = {CVE-2013-1248},
-year = {2013},
-url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
+	title = {{CVE-2013-1248; available at \url{http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248}}},
+	author = {CVE},
+	year = {2013},
+	url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 }
 
 @article{evans2011scalablejemalloc,
@@ -138,341 +146,340 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @article {teb,
-	title = {TEB structure},
+	title = {{TEB structure; available at \url{https://msdn.microsoft.com}}},
 	year = {2017},
-	author={MSDN},
-    url = {https://msdn.microsoft.com/en-us/library/windows/desktop/ms686708(v=vs.85).aspx}
+	author = {Microsoft},
+	url = {https://msdn.microsoft.com/en-us/library/windows/desktop/ms686708(v=vs.85).aspx}
 }
 
 
-@article{corbet2012supervisorsmap,
-  title={Supervisor mode access prevention},
-  author={Corbet, Jonathan},
-  journal={LWN. net},
-  year={2012}
+@misc{corbet2012supervisorsmap,
+	title = {{Supervisor Mode Access Prevention; available at \url{https://prod.lwn.net/Articles/517475}}},
+	author = {Corbet, Jonathan},
+	year = {2012}
 }
 
-@misc{pan2017digtool,
-  title={Digtool: A Virtualization-Based Framework for Detecting Kernel Vulnerabilities},
-  author={Pan, Jianfeng and Yan, Guanglu and Fan, Xiaocao},
-  booktitle={26th USENIX Security Symposium (USENIX Security 17)},
-  year={2017},
-  organization={USENIX Association}
+@inproceedings{pan2017digtool,
+	title={Digtool: A Virtualization-Based Framework for Detecting Kernel Vulnerabilities},
+	author={Pan, Jianfeng and Yan, Guanglu and Fan, Xiaocao},
+	booktitle={26th USENIX Security Symposium (USENIX Security 17)},
+	year={2017},
+	organization={USENIX Association}
 }
 
 @article{bishop1996checking,
-  title={Checking for race conditions in file accesses},
-  author={Bishop, Matt and Dilger, Michael and others},
-  journal={Computing systems},
-  volume={2},
-  number={2},
-  pages={131--152},
-  year={1996}
+	title={{Checking for Race Conditions in File Accesses}},
+	author={Bishop, Matt and Dilger, Michael and others},
+	journal={Computing systems},
+	volume={2},
+	number={2},
+	pages={131--152},
+	year={1996}
 }
 
 @article{bishop1995race,
-  title={Race conditions, files, and security flaws; or the tortoise and the hare redux},
-  author={Bishop, Matt},
-  journal={Technical Report CSE-95-98},
-  year={1995}
+	title={{Race Conditions, Files, and Security Flaws; or the Tortoise and the Hare Redux}},
+	author={Bishop, Matt},
+	journal={Technical Report CSE-95-98},
+	year={1995}
 }
 
-@article{wei2005tocttou,
-  title={TOCTTOU Vulnerabilities in UNIX-Style File Systems: An Anatomical Study.},
-  author={Wei, Jinpeng and Pu, Calton},
-  booktitle={FAST},
-  volume={5},
-  pages={12--12},
-  year={2005}
+@inproceedings{wei2005tocttou,
+	title={{TOCTTOU Vulnerabilities in UNIX-Style File Systems: An Anatomical Study}},
+	author={Wei, Jinpeng and Pu, Calton},
+	booktitle={FAST},
+	volume={5},
+	pages={12--12},
+	year={2005}
 }
 
 @article{yang2012concurrency,
-  title={Concurrency Attacks.},
-  author={Yang, Junfeng and Cui, Ang and Stolfo, Salvatore J and Sethumadhavan, Simha},
-  journal={HotPar},
-  volume={12},
-  pages={15},
-  year={2012}
+	title={{Concurrency Attacks}},
+	author={Yang, Junfeng and Cui, Ang and Stolfo, Salvatore J and Sethumadhavan, Simha},
+	journal={HotPar},
+	volume={12},
+	pages={15},
+	year={2012}
 }
 
 @article{watson2007exploiting,
-  title={Exploiting Concurrency Vulnerabilities in System Call Wrappers.},
-  author={Watson, Robert NM},
-  journal={WOOT},
-  volume={7},
-  pages={1--8},
-  year={2007}
+	title={{Exploiting Concurrency Vulnerabilities in System Call Wrappers}},
+	author={Watson, Robert NM},
+	journal={WOOT},
+	volume={7},
+	pages={1--8},
+	year={2007}
 }
 
-@article{corbet2012linuxsmap,
-  title={Supervisor mode access prevention},
-  author={Corbet, Jonathan},
-  journal={LWN. net},
-  year={2012}
+
+@inproceedings{lu2008learning,
+	title={{Learning from Mistakes: A Comprehensive Study on Real World Concurrency Bug Characteristics}},
+	author={Lu, Shan and Park, Soyeon and Seo, Eunsoo and Zhou, Yuanyuan},
+	booktitle={ACM Sigplan Notices},
+	volume={43},
+	number={3},
+	pages={329--339},
+	year={2008},
+	organization={ACM}
 }
 
-@article{lu2008learning,
-  title={Learning from mistakes: a comprehensive study on real world concurrency bug characteristics},
-  author={Lu, Shan and Park, Soyeon and Seo, Eunsoo and Zhou, Yuanyuan},
-  booktitle={ACM Sigplan Notices},
-  volume={43},
-  number={3},
-  pages={329--339},
-  year={2008},
-  organization={ACM}
+@inproceedings{herlihy1993transactional,
+	title={{Transactional Memory: Architectural Support for Lock-free Data Structures}},
+	author={Herlihy, Maurice and Moss, J Eliot B},
+	booktitle={Proceedings of the 20th annual international symposium on computer architecture},
+	pages={289--300},
+	year={1993},
 }
 
-@misc{herlihy1993transactional,
-  title={Transactional memory: Architectural support for lock-free data structures},
-  author={Herlihy, Maurice and Moss, J Eliot B},
-  volume={21},
-  number={2},
-  year={1993},
-  publisher={ACM}
+@inproceedings{gupta2008racetm,
+	title={{RaceTM: Detecting Data Races using Transactional Memory}},
+	author={Gupta, Shantanu and Sultan, Florin and Cadambi, Srihari and Ivancic, Franjo and Roetteler, Martin},
+	booktitle={Proceedings of the twentieth annual symposium on Parallelism in algorithms and architectures},
+	pages={104--106},
+	year={2008},
+	organization={ACM}
 }
 
-@article{gupta2008racetm,
-  title={Racetm: Detecting data races using transactional memory},
-  author={Gupta, Shantanu and Sultan, Florin and Cadambi, Srihari and Ivancic, Franjo and Roetteler, Martin},
-  booktitle={Proceedings of the twentieth annual symposium on Parallelism in algorithms and architectures},
-  pages={104--106},
-  year={2008},
-  organization={ACM}
+
+@inproceedings{gupta2009using,
+	title={{Using Hardware Transactional Memory for Data Race Detection}},
+	author={Gupta, Shantanu and Sultan, Florin and Cadambi, Srihari and Ivancic, Franjo and Rotteler, Martin},
+	booktitle={2009 IEEE International Symposium on Parallel \& Distributed Processing},
+	pages={1--11},
+	year={2009},
+	organization={IEEE}
 }
 
-@misc{gupta2009using,
-  title={Using hardware transactional memory for data race detection},
-  author={Gupta, Shantanu and Sultan, Florin and Cadambi, Srihari and Ivancic, Franjo and Rotteler, Martin},
-  booktitle={Parallel \& Distributed Processing, 2009. IPDPS 2009. IEEE International Symposium on},
-  pages={1--11},
-  year={2009},
-  organization={IEEE}
-}
 
 @article{shavit1997software,
-  title={Software transactional memory},
-  author={Shavit, Nir and Touitou, Dan},
-  journal={Distributed Computing},
-  volume={10},
-  number={2},
-  pages={99--116},
-  year={1997},
-  publisher={Springer}
+	title={{Software Transactional Memory}},
+	author={Shavit, Nir and Touitou, Dan},
+	journal={Distributed Computing},
+	volume={10},
+	number={2},
+	pages={99--116},
+	year={1997},
+	publisher={Springer}
 }
 
-@misc{erickson2010effective,
-  title={Effective Data-Race Detection for the Kernel},
-  author={Erickson, John and Musuvathi, Madanlal and Burckhardt, Sebastian and Olynyk, Kirk},
-  booktitle={OSDI},
-  volume={10},
-  number={10},
-  pages={1--16},
-  year={2010}
+
+@inproceedings{erickson2010effective,
+	title={{Effective Data-Race Detection for the Kernel}},
+	author={Erickson, John and Musuvathi, Madanlal and Burckhardt, Sebastian and Olynyk, Kirk},
+	booktitle={OSDI},
+	volume={10},
+	number={10},
+	pages={1--16},
+	year={2010}
 }
+
 
 @article{savage1997eraser,
-  title={Eraser: A dynamic data race detector for multithreaded programs},
-  author={Savage, Stefan and Burrows, Michael and Nelson, Greg and Sobalvarro, Patrick and Anderson, Thomas},
-  journal={ACM Transactions on Computer Systems (TOCS)},
-  volume={15},
-  number={4},
-  pages={391--411},
-  year={1997},
-  publisher={ACM}
+	title={{Eraser: A Dynamic Data Race Detector for Multithreaded Programs}},
+	author={Savage, Stefan and Burrows, Michael and Nelson, Greg and Sobalvarro, Patrick and Anderson, Thomas},
+	journal={ACM Transactions on Computer Systems (TOCS)},
+	volume={15},
+	number={4},
+	pages={391--411},
+	year={1997},
+	publisher={ACM}
 }
 
-@misc{o2003hybrid,
-  title={Hybrid dynamic data race detection},
-  author={O'Callahan, Robert and Choi, Jong-Deok},
-  booktitle={Acm Sigplan Notices},
-  volume={38},
-  number={10},
-  pages={167--178},
-  year={2003},
-  organization={ACM}
+
+@inproceedings{o2003hybrid,
+	title={{Hybrid dynamic data race detection}},
+	author={O'callahan, Robert and Choi, Jong-Deok},
+	booktitle={Proceedings of the ninth ACM SIGPLAN symposium on Principles and practice of parallel programming},
+	pages={167--178},
+	year={2003}
 }
 
-@misc{yu2005racetrack,
-  title={Racetrack: efficient detection of data race conditions via adaptive tracking},
-  author={Yu, Yuan and Rodeheffer, Tom and Chen, Wei},
-  booktitle={ACM SIGOPS Operating Systems Review},
-  volume={39},
-  number={5},
-  pages={221--234},
-  year={2005},
-  organization={ACM}
+
+@inproceedings{yu2005racetrack,
+	title={RaceTrack: Efficient Detection of Data Race Conditions via Adaptive Tracking},
+	author={Yu, Yuan and Rodeheffer, Tom and Chen, Wei},
+	booktitle={ACM SIGOPS Operating Systems Review},
+	volume={39},
+	number={5},
+	pages={221--234},
+	year={2005},
+	organization={ACM}
 }
 
-@misc{bond2010pacer,
-  title={PACER: proportional detection of data races},
-  author={Bond, Michael D and Coons, Katherine E and McKinley, Kathryn S},
-  booktitle={ACM Sigplan Notices},
-  volume={45},
-  number={6},
-  pages={255--268},
-  year={2010},
-  organization={ACM}
+@inproceedings{bond2010pacer,
+	title={{PACER: Proportional Detection of Data Races}},
+	author={Bond, Michael D and Coons, Katherine E and McKinley, Kathryn S},
+	booktitle={ACM Sigplan Notices},
+	volume={45},
+	number={6},
+	pages={255--268},
+	year={2010},
+	organization={ACM}
 }
 
-@misc{marino2009literace,
-  title={LiteRace: effective sampling for lightweight data-race detection},
-  author={Marino, Daniel and Musuvathi, Madanlal and Narayanasamy, Satish},
-  booktitle={ACM Sigplan Notices},
-  volume={44},
-  number={6},
-  pages={134--143},
-  year={2009},
-  organization={ACM}
+@inproceedings{marino2009literace,
+	title={{LiteRace: Effective Sampling for Lightweight Data-Race Detection}},
+	author={Marino, Daniel and Musuvathi, Madanlal and Narayanasamy, Satish},
+	booktitle={ACM Sigplan Notices},
+	volume={44},
+	number={6},
+	pages={134--143},
+	year={2009},
+	organization={ACM}
 }
 
-@misc{flanagan2009fasttrack,
-  title={FastTrack: efficient and precise dynamic race detection},
-  author={Flanagan, Cormac and Freund, Stephen N},
-  booktitle={ACM Sigplan Notices},
-  volume={44},
-  number={6},
-  pages={121--133},
-  year={2009},
-  organization={ACM}
+@inproceedings{flanagan2009fasttrack,
+	title={{FastTrack: Efficient and Precise Dynamic Race Detection}},
+	author={Flanagan, Cormac and Freund, Stephen N},
+	booktitle={ACM Sigplan Notices},
+	volume={44},
+	number={6},
+	pages={121--133},
+	year={2009},
+	organization={ACM}
 }
 
 @article{pozniansky2007multirace,
-  title={MultiRace: efficient on-the-fly data race detection in multithreaded C++ programs},
-  author={Pozniansky, Eli and Schuster, Assaf},
-  journal={Concurrency and Computation: Practice and Experience},
-  volume={19},
-  number={3},
-  pages={327--340},
-  year={2007},
-  publisher={Wiley Online Library}
+	title={{MultiRace: efficient on-the-fly data race detection in multithreaded C++ programs}},
+	author={Pozniansky, Eli and Schuster, Assaf},
+	journal={Concurrency and Computation: Practice and Experience},
+	volume={19},
+	number={3},
+	pages={327--340},
+	year={2007},
+	publisher={Wiley Online Library}
 }
 
-@misc{rajwar2012intel,
-  title={Intel transactional synchronization extensions},
-  author={Rajwar, Ravi and Dixon, Martin},
-  booktitle={Intel Developer Forum San Francisco},
-  volume={2012},
-  year={2012}
+@inproceedings{rajwar2012intel,
+	title={{Intel Transactional Synchronization Extensions}},
+	author={Rajwar, Ravi and Dixon, Martin},
+	booktitle={Intel Developer Forum San Francisco},
+	volume={2012},
+	year={2012}
 }
 
 @article{haring2012ibm,
-  title={The ibm blue gene/q compute chip},
-  author={Haring, Ruud and Ohmacht, Martin and Fox, Thomas and Gschwind, Michael and Satterfield, David and Sugavanam, Krishnan and Coteus, Paul and Heidelberger, Philip and Blumrich, Matthias and Wisniewski, Robert and others},
-  journal={IEEE Micro},
-  volume={32},
-  number={2},
-  pages={48--60},
-  year={2012},
-  publisher={IEEE}
+	title={{The IBM Blue Gene/Q Compute Chip}},
+	author={Haring, Ruud and Ohmacht, Martin and Fox, Thomas and Gschwind, Michael and Satterfield, David and Sugavanam, Krishnan and Coteus, Paul and Heidelberger, Philip and Blumrich, Matthias and Wisniewski, Robert and others},
+	journal={IEEE Micro},
+	volume={32},
+	number={2},
+	pages={48--60},
+	year={2012},
+	publisher={IEEE}
 }
 
-@misc{jacobi2012transactional,
-  title={Transactional memory architecture and implementation for IBM System z},
-  author={Jacobi, Christian and Slegel, Timothy and Greiner, Dan},
-  booktitle={Microarchitecture (MICRO), 2012 45th Annual IEEE/ACM International Symposium on},
-  pages={25--36},
-  year={2012},
-  organization={IEEE}
+@inproceedings{jacobi2012transactional,
+	title={{Transactional Memory Architecture and Implementation for IBM System Z}},
+	author={Jacobi, Christian and Slegel, Timothy and Greiner, Dan},
+	booktitle={Microarchitecture (MICRO), 2012 45th Annual IEEE/ACM International Symposium on},
+	pages={25--36},
+	year={2012},
+	organization={IEEE}
 }
 
-@misc{click2009azul,
-  title={Azul's experiences with hardware transactional memory},
-  author={Click, Cliff},
-  booktitle={HP Labs-Bay Area Workshop on Transactional Memory},
-  volume={89},
-  year={2009}
+@inproceedings{click2009azul,
+	title={{Azul's Experiences with Hardware Transactional Memory}},
+	author={Click, Cliff},
+	booktitle={HP Labs-Bay Area Workshop on Transactional Memory},
+	volume={89},
+	year={2009}
 }
 
-@misc{dice2009early,
-  title={Early experience with a commercial hardware transactional memory implementation},
-  author={Dice, Dave and Lev, Yossi and Moir, Mark and Nussbaum, Dan and Olszewski, Marek},
-  year={2009},
-  publisher={Sun Microsystems, Inc.}
+
+@inproceedings{dice2009early,
+	title={{Early Experience with a Commercial Hardware Transactional Memory Implementation}},
+	author={Dice, Dave and Lev, Yossi and Moir, Mark and Nussbaum, Daniel},
+	booktitle={Proceedings of the 14th International Conference on Architectural Support for Programming Languages and Operating Systems},
+	pages={157--168},
+	year={2009}
 }
 
-@misc{zhang2016txrace,
-  title={Txrace: Efficient data race detection using commodity hardware transactional memory},
-  author={Zhang, Tong and Lee, Dongyoon and Jung, Changhee},
-  booktitle={ACM SIGOPS Operating Systems Review},
-  volume={50},
-  number={2},
-  pages={159--173},
-  year={2016},
-  organization={ACM}
+@inproceedings{zhang2016txrace,
+	title={{TxRace: Efficient Data Race Detection Using Commodity Hardware Transactional Memory}},
+	author={Zhang, Tong and Lee, Dongyoon and Jung, Changhee},
+	booktitle={ACM SIGOPS Operating Systems Review},
+	volume={50},
+	number={2},
+	pages={159--173},
+	year={2016},
+	organization={ACM}
 }
 
 @article{intelmanualchapter8,
-  title={and IA-32 Architectures Software Developer’s Manual},
-  author={Intel, Intel},
-  journal={Volume 3A: System Programming Guide, Chapter 8,  Multiple-Processor Management},
-  year={2019}
+	title={{Chapter 8 MULTIPLE-PROCESSOR MANAGEMENT}},
+	author={Intel},
+	journal={Intel 64 and IA-32 Architectures Software Developer’s Manual Volume 3A: System Programming Guide},
+	year={2019}
 }
 
 @misc{msdnwatchdog,
-  title={Bug Check 0x133 \texttt{DPC\_WATCHDOG\_VIOLATION}},
-  author={MSDN},
-  year={2017},
-  url={https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/bug-check-0x133-dpc-watchdog-violation}
+	title={{Bug Check 0x133 \texttt{DPC\_WATCHDOG\_VIOLATION}}; available at \url{https://docs.microsoft.com}},
+	author={Microsoft},
+	year={2017},
+	url={https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/bug-check-0x133-dpc-watchdog-violation}
 }
 
 
 @misc{lawton2003bochs,
-  title={Bochs: The open source IA-32 emulation project},
-  author={Lawton, Kevin},
-  year={2003}
+	title={{Bochs: The Open Source IA-32 Emulation Project}},
+	author={Lawton, Kevin},
+	year={2003}
 }
 
 
 @article{bochspwnreloaded,
-  title={Bochspwn Reloaded: Detecting Kernel Memory Disclosure with x86 Emulation and Taint Tracking},
-  author={Mateusz Jurczyk},
-  journal={Black Hat USA},
-  year={2017}
+	title={Bochspwn Reloaded: Detecting Kernel Memory Disclosure with x86 Emulation and Taint Tracking},
+	author={Mateusz Jurczyk},
+	journal={Black Hat USA},
+	year={2017}
 }
 
 
 @misc{installxpskylake,
-  title={How to install Windows XP on a 2016 Skylake Asus Z170-A motherboard},
-  author={MSDN},
-  year={2016},
-  url={http://www.overclockers.com/forums/showthread.php/774554-How-to-install-Windows-XP-on-a-2016-Skylake-Asus-\\Z170-A-motherboard}
+	title={{How to Install Windows XP on a 2016 Skylake Asus Z170-A Motherboard; avalable at \url{http://www.overclockers.com}}},
+	author={c627627},
+	year={2016},
+	url={http://www.overclockers.com/forums/showthread.php/774554-How-to-install-Windows-XP-on-a-2016-Skylake-Asus-Z170-A-motherboard}
 }
 
-@misc{kestor2014trex,
-  title={T-Rex: A dynamic race detection tool for c/c++ transactional memory applications},
-  author={Kestor, Gokcen and Unsal, Osman S and Cristal, Adrian and Tasiran, Serdar},
-  booktitle={Proceedings of the Ninth European Conference on Computer Systems},
-  pages={20},
-  year={2014},
-  organization={ACM}
-}
-
-
-@misc{dean2004fixing,
-    title={Fixing Races for Fun and Profit: How to Use access (2).},
-    author={Dean, Drew and Hu, Alan J},
-    booktitle={USENIX Security Symposium},
-    pages={195--206},
-    year={2004}
-}
-
-@misc{borisov2005fixing,
-    title={Fixing Races for Fun and Profit: How to Abuse atime.},
-    author={Borisov, Nikita and Johnson, Robert and Sastry, Naveen and Wagner, David},
-    booktitle={USENIX Security Symposium},
-    year={2005}
+@inproceedings{kestor2014trex,
+	title={{T-Rex: A Dynamic Race Detection Tool for C/C++ Transactional Memory Applications}},
+	author={Kestor, Gokcen and Unsal, Osman S and Cristal, Adrian and Tasiran, Serdar},
+	booktitle={Proceedings of the Ninth European Conference on Computer Systems},
+	pages={20},
+	year={2014},
+	organization={ACM}
 }
 
 
-@misc{howtohide,
-    title={How to hide a hook: A hypervisor for rootkits, Phrack 69},
-    author={uty, Saman},
-    year={2016}
+@inproceedings{dean2004fixing,
+	title={{Fixing Races for Fun and Profit: How to Use access (2)}},
+	author={Dean, Drew and Hu, Alan J},
+	booktitle={USENIX Security Symposium},
+	pages={195--206},
+	year={2004}
+}
+
+
+@inproceedings{borisov2005fixing,
+	title={Fixing Races for Fun and Profit: How to abuse atime},
+	author={Borisov, Nikita and Johnson, Robert and Sastry, Naveen and Wagner, David},
+	booktitle={USENIX Security Symposium},
+	year={2005}
+}
+
+
+@inproceedings{howtohide,
+	title={How to hide a hook: A hypervisor for rootkits},
+	author={uty and Saman},
+	booktitle={Phrack 69},
+	year={2016}
 }
 
 
 @inproceedings{krishnan2009hardware,
-	title={Hardware Breakpoint (or watchpoint) usage in Linux Kernel},
+	title={{Hardware Breakpoint (or watchpoint) usage in Linux Kernel}},
 	author={Krishnan, Prasad},
 	booktitle={Proceedings of the Linux Symposium},
 	pages={149--158},
@@ -482,7 +489,7 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @inproceedings{bellard2005qemu,
-	title={QEMU, a fast and portable dynamic translator.},
+	title={{QEMU, a Fast and Portable Dynamic Translator}},
 	author={Bellard, Fabrice},
 	booktitle={USENIX Annual Technical Conference, FREENIX Track},
 	volume={41},
@@ -492,7 +499,7 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @article{ebcioglu2001dynamic,
-	title={Dynamic binary translation and optimization},
+	title={{Dynamic Binary Translation and Optimization}},
 	author={Ebcioglu, Kemal and Altman, Erik and Gschwind, Michael and Sathaye, Sumedh},
 	journal={IEEE Transactions on Computers},
 	volume={50},
@@ -503,8 +510,8 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 }
 
 
-@article{bellard2009tiny,
-	title={Tiny code generator},
+@misc{bellard2009tiny,
+	title={{Tiny Code Generator}},
 	author={Bellard, Fabrice},
 	journal={QEMU git repo at commit a6e0344fa0e09413324835ae122c4cadd7890231},
 	year={2009}
@@ -512,15 +519,15 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @article{quynh2015unicorn,
-	title={Unicorn: Next generation cpu emulator framework},
-	author={Quynh, NGUYEN Anh and Vu, DANG Hoang},
+	title={Unicorn: Next Generation CPU Emulator Framework},
+	author={Quynh, Nguyen Anh and Vu, Dang Hoang},
 	journal={BlackHat USA},
 	year={2015}
 }
 
 
 @article{wang2019dftracker,
-	title={DFTracker: detecting double-fetch bugs by multi-taint parallel tracking},
+	title={{DFTracker: detecting double-fetch bugs by multi-taint parallel tracking}},
 	author={Wang, Pengfei and Lu, Kai and Li, Gen and Zhou, Xu},
 	journal={Frontiers of Computer Science},
 	volume={13},
@@ -531,46 +538,25 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 }
 
 
-@misc{serna2008ms08,
-	title={MS08-061: The case of the kernel mode double-fetch},
-	author={Serna, Fermin J},
-	year={2008}
-}
-
 @misc{ms13016,
-	title={Microsoft Security Bulletin MS13-016 - Important Vulnerabilities in Windows Kernel-Mode Driver Could Allow Elevation of Privilege (2778344)},
+	title={{Microsoft Security Bulletin MS13-016; available at \url{https://docs.microsoft.com}}},
 	author={Microsoft},
 	year={2013}
 }
 
 
-@misc{mulnix2016intel,
-	title={Intel Xeon Processor D product family technical overview},
-	author={Mulnix, David},
-	year={2016}
-}
-
 
 @inproceedings{fischer2011supervisor,
-	title={Supervisor mode execution protection},
+	title={{Supervisor Mode Execution Protection}},
 	author={Fischer, Stephen},
 	booktitle={NSA Trusted Computing Conference and Exposition},
 	year={2011}
 }
 
 
-@article{guide2011intel,
-	title={Intel{\textregistered} 64 and ia-32 architectures software developer’s manual},
-	author={Guide, Part},
-	journal={Volume 3B: System programming Guide, Part},
-	volume={2},
-	pages={11},
-	year={2011}
-}
-
 
 @article{neiger2006intel,
-	title={Intel Virtualization Technology: Hardware Support for Efficient Processor Virtualization.},
+	title={{Intel Virtualization Technology: Hardware Support for Efficient Processor Virtualization}},
 	author={Neiger, Gil and Santoni, Amy and Leung, Felix and Rodgers, Dion and Uhlig, Rich},
 	journal={Intel Technology Journal},
 	volume={10},
@@ -580,7 +566,7 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @inproceedings{nagarakatte2015everything,
-	title={Everything you want to know about pointer-based checking},
+	title={{Everything You Want to Know About Pointer-Based Checking}},
 	author={Nagarakatte, Santosh and Martin, Milo MK and Zdancewic, Steve},
 	booktitle={1st Summit on Advances in Programming Languages (SNAPL 2015)},
 	year={2015},
@@ -589,7 +575,7 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @inproceedings{zhang2010intpatch,
-	title={IntPatch: Automatically fix integer-overflow-to-buffer-overflow vulnerability at compile-time},
+	title={{IntPatch: Automatically Fix Integer-Overflow-to-Buffer-Overflow Vulnerability at Compile-Time}},
 	author={Zhang, Chao and Wang, Tielei and Wei, Tao and Chen, Yu and Zou, Wei},
 	booktitle={European Symposium on Research in Computer Security},
 	pages={71--86},
@@ -599,7 +585,7 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @inproceedings{feist2016finding,
-	title={Finding the needle in the heap: combining static analysis and dynamic symbolic execution to trigger use-after-free},
+	title={Finding the Needle in the Heap: Combining Static Analysis and Dynamic Symbolic Execution to Trigger Use-After-Free},
 	author={Feist, Josselin and Mounier, Laurent and Bardin, S{\'e}bastien and David, Robin and Potet, Marie-Laure},
 	booktitle={Proceedings of the 6th Workshop on Software Security, Protection, and Reverse Engineering},
 	pages={1--12},
@@ -608,7 +594,7 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @inproceedings{chen2020savior,
-	title={Savior: Towards bug-driven hybrid testing},
+	title={{Savior: Towards Bug-Driven Hybrid Testing}},
 	author={Chen, Yaohui and Li, Peng and Xu, Jun and Guo, Shengjian and Zhou, Rundong and Zhang, Yulong and Wei, Tao and Lu, Long},
 	booktitle={2020 IEEE Symposium on Security and Privacy (SP)},
 	pages={1580--1596},
@@ -618,7 +604,7 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @inproceedings{lee2015preventing,
-	title={Preventing Use-after-free with Dangling Pointers Nullification.},
+	title={{Preventing Use-after-free with Dangling Pointers Nullification}},
 	author={Lee, Byoungyoung and Song, Chengyu and Jang, Yeongjin and Wang, Tielei and Kim, Taesoo and Lu, Long and Lee, Wenke},
 	booktitle={NDSS},
 	year={2015}
@@ -626,16 +612,16 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @inproceedings{serebryany2012addresssanitizer,
-	title={AddressSanitizer: A fast address sanity checker},
+	title={{AddressSanitizer: A Fast Address Sanity Checker}},
 	author={Serebryany, Konstantin and Bruening, Derek and Potapenko, Alexander and Vyukov, Dmitriy},
-	booktitle={Presented as part of the 2012 USENIX Annual Technical Conference (12)},
+	booktitle={Presented as part of the 2012 USENIX Annual Technical Conference},
 	pages={309--318},
 	year={2012}
 }
 
 
 @article{luk2005pin,
-	title={{Pin: building customized program analysis tools with dynamic instrumentation}},
+	title={{Pin: Building Customized Program Analysis Tools with Dynamic Instrumentation}},
 	author={Luk, Chi-Keung and Cohn, Robert and Muth, Robert and Patil, Harish and Klauser, Artur and Lowney, Geoff and Wallace, Steven and Reddi, Vijay Janapa and Hazelwood, Kim},
 	journal={Acm sigplan notices},
 	volume={40},
@@ -648,7 +634,7 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @article{nethercote2007valgrind,
-	title={Valgrind: a framework for heavyweight dynamic binary instrumentation},
+	title={{Valgrind: A Framework for Heavyweight Dynamic Binary Instrumentation}},
 	author={Nethercote, Nicholas and Seward, Julian},
 	journal={ACM Sigplan notices},
 	volume={42},
@@ -661,7 +647,7 @@ url = {http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=cve-2013-1248},
 
 
 @article{abadi2008semantics,
-	title={Semantics of transactional memory and automatic mutual exclusion},
+	title={{Semantics of Transactional Memory and Automatic Mutual Exclusion}},
 	author={Abadi, Mart{\'\i}n and Birrell, Andrew and Harris, Tim and Isard, Michael},
 	journal={ACM SIGPLAN Notices},
 	volume={43},

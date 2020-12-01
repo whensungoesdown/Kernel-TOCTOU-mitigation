@@ -19,7 +19,7 @@
 
 \subsection{Kernel-level TOCTOU Vulnerability}
 
-TOCTOU is a type of vulnerability that involves two references on the same variable or system state. The attacker usually passes the first security check with a benign value and then changes it to a malicious one before the second reference. It is a classic vulnerability, mostly amount file system APIs, which many previous research works have addressed it~\cite{dean2004fixing}~\cite{borisov2005fixing}.
+TOCTOU is a type of vulnerability that involves two references on the same variable or system state. The attacker usually passes the first security check with a benign value and then changes it to a malicious one before the second reference. It is a classic vulnerability, mostly amount file system APIs, which many previous research works have addressed it~\cite{dean2004fixing}~\cite{borisov2005fixing}~\cite{bishop1996checking}~\cite{bishop1995race}~\cite{wei2005tocttou}.
 
 
 TOCTOU also happens in the operating system kernel. Unlike the classic file system TOCTOU that between APIs, kernel-level TOCTOU happens within individual system calls. When a user program invokes a system call, it usually needs to provide parameters, and it is the kernel's responsibility to verify the legitimacy of the parameters and makes a kernel copy for subsequent use. However, the kernel may fail to accomplish that. Due to the developer's coding style or the unawareness of such vulnerability, the kernel routines do not use the kernel copy of user parameters and fetch the data from userspace again. Even worse, due to various reasons, a kernel module may not fully decouple with the user-mode components, and it directly uses data from userspace.
@@ -28,7 +28,7 @@ TOCTOU also happens in the operating system kernel. Unlike the classic file syst
 The double or multiple fetches may lead to severe issues such as local privilege escalation vulnerability. The parameter sent into the kernel is benign initially to pass the security check; then, the attacker alters it to malicious to introduce an error such as a buffer overflow to the kernel. Although the time window between two kernel fetches may be as narrow as several instructions, it is feasible to create the race condition with careful craft, especially on a multi-processor system.
 
 
-Due to mistakenly repeated operations on user parameters, kernel-level TOCTOU widely exists among operating systems, even in a system such as Linux that use particular gateway functions, \texttt{copy\_to\_user()} and \texttt{copy\_from\_user()}, to get user parameters. ~\autoref{table:cves} lists a portion of recent kernel-level TOCTOU vulnerabilities.
+Due to mistakenly repeated operations on user parameters, kernel-level TOCTOU widely exists among operating systems~\cite{watson2007exploiting}~\cite{yang2012concurrency}~\cite{lu2008learning}, even in a system such as Linux that use particular gateway functions, \texttt{copy\_to\_user()} and \texttt{copy\_from\_user()}, to get user parameters~\cite{double-fetch-linux}. ~\autoref{table:cves} lists a portion of recent kernel-level TOCTOU vulnerabilities.
 
 
 \begin{center}
@@ -93,7 +93,7 @@ CVE-2020-5967  & Nvidia  & CVE-2020-8680 & Intel \\
 
 Monitoring the kernel's userspace behavior is essential to \name. Due to x86 protected mode characteristics, there is no mechanism available for a broad range of monitoring memory modifications. Techniques such as leveraging hardware watchpoints or transactional memory are fittable for fuzzing such vulnerabilities but not for run-time protection. We discuss these two techniques in more details in~\autoref{sec:ktoctou-experiment} and~\autoref{sec:ktoctou-relatedwork}.
 
-Fortunately, we notice an Intel processor feature so-called Supervisor Mode Access Prevention (SMAP)~\cite{corbet2012supervisorsmap}~\cite{mulnix2016intel} that accurately serves our requirement for monitoring kernel.
+Fortunately, we notice an Intel processor feature so-called Supervisor Mode Access Prevention (SMAP)~\cite{corbet2012supervisorsmap} that accurately serves our requirement for monitoring kernel.
 SMAP is a feature that prevents the kernel from freely accessing userspace so that such access will raise an exception. It complements Supervisor Mode Execution Prevention (SMEP)~\cite{fischer2011supervisor} that introduced earlier. SMEP can be used to prevent the kernel from unintentionally executing user-mode code. SMAP extends this protection to reads and writes. It makes it harder for a malicious program to deceive the kernel into using code or data from the userspace.
 
 SMAP is enabled when set SMAP (20) bit in CR4 and can be temporarily disabled by setting the AC flag in EFLAGS or through using \texttt{stac} and \texttt{clac} instructions. Temporarily disabling SMAP indicates that the kernel is fully aware of its userspace-access behavior. For example, The Linux kernel supports SMAP since version 3.7. The kernel-to-userspace accesses must go through two gateway functions \texttt{copy\_to\_user()} and \texttt{copy\_from\_user()}, in which SMAP is temporarily disabled.
@@ -124,7 +124,7 @@ In this part, we briefly describe concepts and mechanisms regarding x86 architec
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/pagetable}
   \centering
-  \caption{Linear-Address Translation to a 4-KBbyte Page using 32-Bit Paging~\cite{guide2011intel}}
+  \caption{Linear-Address Translation to a 4-KBbyte Page using 32-Bit Paging~\cite{intelpaging}}
   \label{fig:pagetable}
 \end{figure}
 

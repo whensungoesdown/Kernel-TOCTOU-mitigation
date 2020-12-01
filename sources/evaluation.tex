@@ -153,7 +153,7 @@ Considering the kernel is fully aware of the untrustworthy user-supplied paramet
 \subsection{Case Study}
 
 
-\textbf{\textit{CVE-2008-2252}} is a bug reported by Thomas Garnier in 2008 and fixed by Microsoft as part of the MS08-061 security bulletin.  It is a typical TOCTOU vulnerability addressed in many previous research works~\cite{serna2008ms08}~\cite{wang2019dftracker}~\cite{jurczyk2013identifying}. To evaluate the effectiveness of our mitigation, we want to test it on a real hardware machine. SMAP and SMEP are only available on a relatively new processor, Intel 5 generation CPU (architecture code name Broadwell). It is troublesome to install the Windows XP operating system on a modern PC. The chipset with an integrated hard disk controller no longer supports IDE mode, and Windows XP does not support the advanced host controller interface (AHCI) either. For us, we need an additional AHCI driver for Windows XP and a tool to virtualize a floppy drive~\cite{installxpskylake} to provide it during the installation.
+\textbf{\textit{CVE-2008-2252}} is a bug reported by Thomas Garnier in 2008 and fixed by Microsoft as part of the MS08-061 security bulletin.  It is a typical TOCTOU vulnerability addressed in many previous research works~\cite{wang2019dftracker}~\cite{jurczyk2013identifying}. To evaluate the effectiveness of our mitigation, we want to test it on a real hardware machine. SMAP and SMEP are only available on a relatively new processor, Intel 5 generation CPU (architecture code name Broadwell). It is troublesome to install the Windows XP operating system on a modern PC. The chipset with an integrated hard disk controller no longer supports IDE mode, and Windows XP does not support the advanced host controller interface (AHCI) either. For us, we need an additional AHCI driver for Windows XP and a tool to virtualize a floppy drive~\cite{installxpskylake} to provide it during the installation.
 
 We write a proof-of-concept (POC) program to exploit the CVE-2008-2252 vulnerability. If it flips the user-mode variable between the two kernel fetches, it will create a memory buffer overflow in the kernel. We test it against our mitigation in a multi-processor system.
 
@@ -175,7 +175,7 @@ As shown in~\autoref{fig:ms08061case}, the kernel reads the user-mode variable a
 
 
 
-\textbf{\textit{CVE-2013-1254.}} Similar to the one above mentioned, CVE-2013-1254 is another typical TOCTOU vulnerability. It is a family of 27 distinct vulnerabilities~\cite{ms13016}~\cite{jurczyk2013identifying} in the win32k module. It affects a variety of operating systems from Windows XP to Windows Server 2012.
+\textbf{\textit{CVE-2013-1254.}} Similar to the one above mentioned, CVE-2013-1254~\cite{CVE-2013-1254} is another typical TOCTOU vulnerability. It is a family of 27 distinct vulnerabilities~\cite{ms13016}~\cite{jurczyk2013identifying} in the win32k module. It affects a variety of operating systems from Windows XP to Windows Server 2012.
 
 
 \begin{figure}[th]
