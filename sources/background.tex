@@ -30,6 +30,7 @@ The double or multiple fetches may lead to severe issues such as local privilege
 
 Due to mistakenly repeated operations on user parameters, kernel-level TOCTOU widely exists among operating systems~\cite{watson2007exploiting}~\cite{yang2012concurrency}~\cite{lu2008learning}, even in a system such as Linux that use particular gateway functions, \texttt{copy\_to\_user()} and \texttt{copy\_from\_user()}, to get user parameters~\cite{double-fetch-linux}. ~\autoref{table:cves} lists a portion of recent kernel-level TOCTOU vulnerabilities.
 
+\vspace*{-\baselineskip}
 
 \begin{center}
 \begin{table}[ht]
@@ -55,11 +56,11 @@ CVE-2016-10383 & Android & CVE-2017-7115 & iOS \\
 
 CVE-2020-5967  & Nvidia  & CVE-2020-8680 & Intel \\
 \hline
-
 \end{tabular}
 \end{table}
 \end{center}
 
+\vspace*{-\baselineskip}
 
 
 

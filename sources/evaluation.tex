@@ -49,6 +49,7 @@ To test web servers, we count their response time for a web request. For compres
 
 \textbf{\textit{GUI.}} Through our investigation, we find that the Windows graphical subsystem, namely, Win32k.sys, has the most double-fetch issues.  Because GUI programs need to redraw their graphical components frequently, they invoke the win32k system calls a lot, even for a simple program such as Windows notepad. Therefore,  our mitigation incurs an unneglectable performance over GUI programs. The overhead is primarily affected by how often the interface is refreshed. For example, if minimizing a GUI program's window, its performance will not be slow down by the graphical interface at all. We compare GUI programs with non-GUI programs in the following aspects: the number of user pages accessed by kernel per system call and how many double fetches occur. We drag the GUI program's window to trigger redraw, and we send one URL request to the web servers per second. The measurement takes the first 500 system calls.
 
+\vspace*{-\baselineskip}
 \begin{center}
 \begin{table}[ht]
 	\small
@@ -75,7 +76,7 @@ To test web servers, we count their response time for a web request. For compres
 	\end{tabular}
 \end{table}
 \end{center}
-
+\vspace*{-\baselineskip}
 
 \autoref{table:pages} shows some interesting results. Refreshing the GUI takes tremendous system calls. As expected, both the kernel and the Win32k subsystem accesses user pages, but the win32k accesses more than the kernel. They both \textit{capture} the user parameters at each system call, but the win32k module read/write more user data even in the middle of a system call.
 
@@ -111,6 +112,8 @@ The column \textit{Double Fetch} shows the user-addresses that are read more tha
 
 Furthermore, with reverse-engineering effort, we find that the Win32k module directly read the user variable and without the protection of a try-catch block in some of those cases. It is dangerous. The user programs can free the user memory and cause the kernel code to access an invalid page without protection, which leads to a crash.
 
+
+\vspace*{-\baselineskip}
 \begin{center}
 	\begin{table}[ht]
 		\small
@@ -141,6 +144,7 @@ Furthermore, with reverse-engineering effort, we find that the Win32k module dir
 		\end{tabular}
 	\end{table}
 \end{center}
+\vspace*{-\baselineskip}
 
 
 
