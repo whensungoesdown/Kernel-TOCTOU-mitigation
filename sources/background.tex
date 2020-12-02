@@ -4,31 +4,19 @@
 \label{sec:ktoctou-background}
 
 
-%TOCTOU is a vulnerability class caused by changes in a system between checking a condition and using that check results. Typically, a variable or system state changes after it passes the sanity check. It is a classic vulnerability, mostly amount file system APIs. Many previous research works have addressed it~\cite{dean2004fixing}~\cite{borisov2005fixing}. Before introducing the relatively new kernel-level TOCTOU, we first briefly describe the classic TOCTOU as shown in~\autoref{fig:toctou}.
-
-%\begin{figure}[th]
-%	\includegraphics[width=0.47\textwidth]{figures/toctou}
-%	\centering
-%	\caption{The gap between access() and open() leaves the attack time window for the attacker to make changes in the file system.}
-%	\label{fig:toctou}
-%\end{figure}
-%
-%Assume this code piece belongs to a setuid program. It first validates that the ``pathname'' is readable, and if so, open the file for reading. However, the attacker can change the file system between the two system calls to trick the setuid program into opening a file that it should not.
-
-
 
 \subsection{Kernel-level TOCTOU Vulnerability}
 
-TOCTOU is a type of vulnerability that involves two references on the same variable or system state. The attacker usually passes the first security check with a benign value and then changes it to a malicious one before the second reference. It is a classic vulnerability, mostly amount file system APIs, which many previous research works have addressed it~\cite{dean2004fixing}~\cite{borisov2005fixing}~\cite{bishop1996checking}~\cite{bishop1995race}~\cite{wei2005tocttou}.
+TOCTOU is a type of vulnerability that involves two references on the same variable or system state. The attacker usually passes the first security check with a benign value and then alters it to malicious before the second reference. It is a classic vulnerability, mostly amount file system APIs, which many previous research works have addressed it~\cite{dean2004fixing}~\cite{borisov2005fixing}~\cite{bishop1996checking}~\cite{bishop1995race}~\cite{wei2005tocttou}.
 
 
-TOCTOU also happens in the operating system kernel. Unlike the classic file system TOCTOU that between APIs, kernel-level TOCTOU happens within individual system calls. When a user program invokes a system call, it usually needs to provide parameters, and it is the kernel's responsibility to verify the legitimacy of the parameters and makes a kernel copy for subsequent use. However, the kernel may fail to accomplish that. Due to the developer's coding style or the unawareness of such vulnerability, the kernel routines do not use the kernel copy of user parameters and fetch the data from userspace again. Even worse, due to various reasons, a kernel module may not fully decouple with the user-mode components, and it directly uses data from userspace.
+TOCTOU also exists in the operating system kernel. Unlike the classic file system TOCTOU that between APIs, kernel-level TOCTOU appears within individual system calls. When a user program invokes a system call, it usually needs to provide parameters, and it is the kernel's responsibility to verify the legitimacy of the parameters and saves a kernel copy for subsequent use. However, the kernel may fail to accomplish that. Due to the developer's coding style or the unawareness of such vulnerability, the kernel routines do not use the kernel copy; instead, fetch the data from userspace again. Even worse, for historical reasons, a kernel module may not fully decouple with the user-mode components; thus, it directly uses user-mode data.
 
 
-The double or multiple fetches may lead to severe issues such as local privilege escalation vulnerability. The parameter sent into the kernel is benign initially to pass the security check; then, the attacker alters it to malicious to introduce an error such as a buffer overflow to the kernel. Although the time window between two kernel fetches may be as narrow as several instructions, it is feasible to create the race condition with careful craft, especially on a multi-processor system.
+The double or multiple fetches may lead to a severe issue, as we call it kernel-level TOCTOU vulnerability that attackers usually use to escalate privilege. The parameter sent into the kernel is benign initially to pass the security check; then, the attacker alters it to malicious to introduce an error such as a buffer overflow to the kernel. Although the time window between two kernel fetches may be as narrow as several instructions, it is feasible to create the race condition with careful craft, especially on a multi-processor system.
 
 
-Due to mistakenly repeated operations on user parameters, kernel-level TOCTOU widely exists among operating systems~\cite{watson2007exploiting}~\cite{yang2012concurrency}~\cite{lu2008learning}, even in a system such as Linux that use particular gateway functions, \texttt{copy\_to\_user()} and \texttt{copy\_from\_user()}, to get user parameters~\cite{double-fetch-linux}. ~\autoref{table:cves} lists a portion of recent kernel-level TOCTOU vulnerabilities.
+Due to mistakenly repeated operations on user data, kernel-level TOCTOU widely exists among operating systems~\cite{watson2007exploiting}~\cite{yang2012concurrency}~\cite{lu2008learning}, even in a system such as Linux that use particular gateway functions, \texttt{copy\_to\_user()} and \texttt{copy\_from\_user()}, to get user parameters~\cite{double-fetch-linux}. ~\autoref{table:cves} lists a portion of recent kernel-level TOCTOU vulnerabilities.
 
 \vspace*{-\baselineskip}
 
@@ -40,10 +28,10 @@ Due to mistakenly repeated operations on user parameters, kernel-level TOCTOU wi
 \caption{Recent vulnerabilities categorized as race condition or time-of-check-to-time-of-use in the CVE database.}
 \label{table:cves}
 \centering
-	\begin{tabular}{@{}>{\raggedright\arraybackslash}m{2.35cm}@{}|
-			@{}>{\centering\arraybackslash}m{1.35cm}@{}|
-			@{}>{\centering\arraybackslash}m{2.35cm}@{}|
-			@{}>{\centering\arraybackslash}m{1.25cm}@{} } 
+	\begin{tabular}{@{}>{\raggedright\arraybackslash}m{2.40cm}@{}|
+			@{}>{\centering\arraybackslash}m{1.50cm}@{}|
+			@{}>{\centering\arraybackslash}m{2.40cm}@{}|
+			@{}>{\centering\arraybackslash}m{1.35cm}@{} } 
 \hline
 CVE-ID & Affected System & CVE-ID & Affected System \\ %[0.5ex]
 \hline
@@ -52,7 +40,7 @@ CVE-2013-1280  & Windows & CVE-2016-6130 & Linux \\
 CVE-2018-7249  & Windows & CVE-2020-9796 & macOS \\ 
 CVE-2020-9839  & macOS   & CVE-2020-9990 & macOS \\
 CVE-2016-10439 & Android & CVE-2016-7624 & macOS \\
-CVE-2016-10383 & Android & CVE-2017-7115 & iOS \\
+CVE-2016-10383 & Android & CVE-2017-7115 & iOS   \\
 
 CVE-2020-5967  & Nvidia  & CVE-2020-8680 & Intel \\
 \hline
@@ -73,11 +61,10 @@ CVE-2020-5967  & Nvidia  & CVE-2020-8680 & Intel \\
 
 
 
+~\autoref{fig:code08061} shows a Windows Win32k module's kernel-level TOCTOU vulnerability~\cite{jurczyk2013identifying}~\cite{ms08061}, which has been identified and patched in Microsoft security bulletins ms08-061. The pseudo-code reassembles to a Win32k system call, and the red part shows the vulnerable data's trace.  The user program passes \texttt{lParam} to \texttt{win32k\_function()} through upper layer APIs.  Adding \texttt{my\_struct->cbData} to \texttt{cbCapture} is where the kernel first gets this user-mode variable and allocates a buffer based on its value. Notice, although there is a local variable called \textit{capture}, the developer forgot to use it subsequently.  Several instructions after, the kernel reread this user-mode variable when copy data into the new buffer.  An attacker can alter the user-mode variable \texttt{my\_struct->cbData} between the two reads, and especially by enlarging it, a kernel buffer overflow is created.
 
-~\autoref{fig:code08061} shows a kernel-level TOCTOU vulnerability pseudo-code from the Windows Win32k module~\cite{jurczyk2013identifying}~\cite{ms08061}. It has been identified and patched in ms08-061. The code belongs to a Win32k system call, and the red part shows the trace of the vulnerable data.  The user program passes \texttt{lParam} to \texttt{win32k\_function()} through upper layer APIs.  Adding \texttt{my\_struct->cbData} to \texttt{cbCapture} is where the kernel first gets this variable and allocates a buffer based on it. Notice, although the variable is called \textit{capture}, the developer forgot to use it subsequently.  Several instructions after, the kernel fetches this variable again when copy data into the new buffer.  An attacker can change the user variable \texttt{my\_struct->cbData} between the two fetches, especially enlarge it. Then it is a kernel buffer overflow.
 
-
-~\autoref{fig:toctouasm} shows the attack.  To exploit a local privilege escalation vulnerability, the attacker can invoke the vulnerable system call as many times as needed and create another thread to race with the kernel, aiming to enlarge the data during the time window. Thread 1 keeps flipping one higher bit in the variable to make the second fetch's value larger than the first one. It succeeds by chance; otherwise, the attacker can repeat the attack.
+~\autoref{fig:toctouasm} gives the code-level exploit simulation.  As a local privilege escalation vulnerability, the attacker can invoke the vulnerable system call as many times as needed to succeed. Meantime, thread one is spawned to race with the kernel, aiming to enlarge the user variable. To generate the buffer overflow, the attacker needs to flip the high bit an odd number of times during the time window.
 
 
 \begin{figure}[ht]
