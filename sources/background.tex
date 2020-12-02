@@ -64,13 +64,13 @@ CVE-2020-5967  & Nvidia  & CVE-2020-8680 & Intel \\
 ~\autoref{fig:code08061} shows a Windows Win32k module's kernel-level TOCTOU vulnerability~\cite{jurczyk2013identifying}~\cite{ms08061}, which has been identified and patched in Microsoft security bulletins ms08-061. The pseudo-code reassembles to a Win32k system call, and the red part shows the vulnerable data's trace.  The user program passes \texttt{lParam} to \texttt{win32k\_function()} through upper layer APIs.  Adding \texttt{my\_struct->cbData} to \texttt{cbCapture} is where the kernel first gets this user-mode variable and allocates a buffer based on its value. Notice, although there is a local variable called \textit{capture}, the developer forgot to use it subsequently.  Several instructions after, the kernel reread this user-mode variable when copy data into the new buffer.  An attacker can alter the user-mode variable \texttt{my\_struct->cbData} between the two reads, and especially by enlarging it, a kernel buffer overflow is created.
 
 
-~\autoref{fig:toctouasm} gives the code-level exploit simulation.  As a local privilege escalation vulnerability, the attacker can invoke the vulnerable system call as many times as needed to succeed. Meantime, thread one is spawned to race with the kernel, aiming to enlarge the user variable. To generate the buffer overflow, the attacker needs to flip the high bit an odd number of times during the time window.
+~\autoref{fig:toctouasm} gives the assembly-code-level exploit simulation.  As a local privilege escalation vulnerability, the attacker can invoke the vulnerable system call as many times as needed to succeed. Meantime, thread one is spawned to race with the kernel, aiming to enlarge the user variable. To generate the buffer overflow, the attacker needs to flip the high bit an odd number of times during the time window.
 
 
 \begin{figure}[ht]
   \includegraphics[width=0.47\textwidth]{figures/toctouasm3}
   \centering
-  \caption{Thread 0 runs the vulnerable system call in the kernel-mode. The attacker can repeatedly call it to open the attack time window multiple times. Simultaneously, the other user-mode thread created by the attacker tries to flip the user-mode variable in-between the time window. So that the kernel code, two times, get the value differently.}
+  \caption{Thread zero invokes the vulnerable system call. The attack windows lie in between the two kernel reads, namely, the two instructions that underscored. The attacker can repeatedly open the attack time window by calling the system call. Simultaneously, thread one flips the high bit of the user-mode variable in a loop. The two threads compete, hoping an odd number of flips occur during the time window. It enlarges the variable; otherwise, the variable remains the same.}
   \label{fig:toctouasm}
 \end{figure}
 
