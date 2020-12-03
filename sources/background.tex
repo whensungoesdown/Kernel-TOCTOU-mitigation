@@ -75,7 +75,6 @@ CVE-2020-5967  & Nvidia  & CVE-2020-8680 & Intel \\
 \end{figure}
 
 
-%Once this step is accomplished, the problem becomes how to exploit it a classic heap buffer overflow. So you can see that kernel TOCTOU itself may not seems to be harmful, but it could lead to something serious. 
 
 \subsection{Supervisor Mode Access Prevention (SMAP)}
 
@@ -88,13 +87,16 @@ Setting SMAP (20) bit in CR4 enables it, and it can also be temporarily disabled
 
 However, Windows does not support SMAP still. The kernel takes a different approach other than gateway functions; it uses \textit{probe} and \textit{capture} in each system call. \texttt{ProbeForWrite()}  and \texttt{ProbeForRead()}~\cite{probeforread} validates user-mode variables and buffers and this method is effective if done correctly and thoroughly. However, kernel components such as Win32k failed to follow the coding rule.  Some of its code is still coupled with user-mode components. It will cost a huge engineering effort to change the coding style for the enormous codebase.
 
+
+
 \subsection{Intel Virtualization Technology}
 
-Intel Virtual-Machine Extensions (VMX) provides hardware-assistant virtualization that adds 13 new instructions: VMPTRLD, VMPTRST, VMCLEAR, VMREAD, VMWRITE, VMCALL, VMLAUNCH, VMRESUME, VMXOFF, VMXON, INVEPT, INVVPID, and VMFUNC. VMX supports root and non-root mode, where root mode runs the hypervisor, and the non-root mode runs virtual machines or called guests. On x86 architecture, the processor has four privilege rings. The kernel runs at ring zero, the highest priority ring; the user programs run at ring three; ring one and ring two are unused. With VMX, the root model is commonly seen as the ring minus one.
+Intel Virtual-Machine Extensions (VMX) provides hardware-assistant virtualization that adds 13 new instructions: VMPTRLD, VMPTRST, VMCLEAR, VMREAD, VMWRITE, VMCALL, VMLAUNCH, VMRESUME, VMXOFF, VMXON, INVEPT, INVVPID, and VMFUNC. VMX has root and non-root mode, where root mode runs the hypervisor, and the non-root mode runs virtual machines or called guests. On x86 architecture, the processor has four privilege rings. The kernel runs at ring zero, the highest priority ring; the user programs run at ring three; ring one and ring two are unused. With VMX, the root model is commonly viewed as the ring minus one, which is more privileged than ring zero.
 
-VMXON/VMXOFF enters/exits VMX mode. The Virtual Machine Control Structure (VMCS) is the most important data structure, storing the data and states of one virtual processor of one virtual machine. Each core in a physical processor has a VMCS pointer. It points to the physical address of one VMCS. VMPTRLD loads the VMCS pointer from physical memory and set it active and current. VMCLEAR stores VMCS active states back to memory and set it inactive. Although the hypervisor is fully aware of the physical address of each VMCS, it can not modify them directly. All the modifications on VMCS should use the instruction VMREAD and VMWRITE. 
+VMXON/VMXOFF enters/exits VMX mode. The Virtual Machine Control Structure (VMCS) is the most important data structure, storing the data and states of one virtual processor of one virtual machine. Each core in a physical processor has a VMCS pointer. It points to the physical address of the VMCS. VMPTRLD loads the VMCS pointer from physical memory and set it active and current. VMCLEAR stores VMCS active states back to memory and set it inactive. Although the hypervisor is fully aware of the physical address of each VMCS, it can not modify them directly. All the modifications on VMCS should use the instruction VMREAD and VMWRITE instead.
 
-The VMCS manages aspects of a virtual machine as many data-fields organized into six logical groups: Guest-state area, Host-state area, VM-execution control fields, VM-exit control fields, VM-entry control fields, and VM-exit information fields. The last four groups compose VMX controls that command the virtual machine's behavior. In VMX's term, VM entry is the transition from VMX root mode to the non-root mode; VM exit is the opposite. During a VM exit, the processor stores its running state into the Guest-state area in memory and loads the Host-state area into the hardware. The processor does the opposite when entering a virtual machine, the so-called VM enter.
+The VMCS manages aspects of a virtual machine using many data-fields organized into six logical groups: Guest-state area, Host-state area, VM-execution control fields, VM-exit control fields, VM-entry control fields, and VM-exit information fields. The last four groups compose VMX controls that conduct the virtual machine's behavior. In VMX's term, VM entry is the transition from VMX root mode to the non-root mode; VM exit is the opposite. During a VM exit, the processor stores its running state into the Guest-state area in memory and loads the Host-state area into the hardware. The processor does the opposite when entering a virtual machine, the so-called VM entry.
+
 
 
 \subsection{x86 Architecture}
