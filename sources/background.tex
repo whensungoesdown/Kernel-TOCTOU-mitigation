@@ -52,16 +52,16 @@ CVE-2020-5967  & Nvidia  & CVE-2020-8680 & Intel \\
 
 
 
+~\autoref{fig:code08061} shows a Windows Win32k module's kernel-level TOCTOU vulnerability~\cite{jurczyk2013identifying}~\cite{ms08061}, which has been identified and patched in Microsoft security bulletins ms08-061. The pseudo-code reassembles to a Win32k system call, and the red part shows the vulnerable data's trace.  The user program passes \texttt{lParam} to \texttt{win32k\_function()} through upper layer APIs.  Adding \texttt{my\_struct->cbData} to \texttt{cbCapture} is where the kernel first gets this user-mode variable and allocates a buffer based on its value. Notice, although there is a local variable called \textit{capture}, the developer forgot to use it subsequently.  Several instructions after, the kernel reread this user-mode variable when copy data into the new buffer.  An attacker can alter the user-mode variable \texttt{my\_struct->cbData} between the two reads, and especially by enlarging it, a kernel buffer overflow is created.
+
+
+
 \begin{figure}[th]
 	\includegraphics[width=0.47\textwidth]{figures/code08061}
 	\centering
 	\caption{Pseudocode of the vulnerability fixed in ms08-061. The vulnerable variable is in red. The kernel reads it twice, and it may get a different value for the buffer allocation and the subsequent buffer copying. It is common to see such a coding style. However, it is vulnerable because the two reads cross the privilege boundary.}
 	\label{fig:code08061}
 \end{figure}
-
-
-
-~\autoref{fig:code08061} shows a Windows Win32k module's kernel-level TOCTOU vulnerability~\cite{jurczyk2013identifying}~\cite{ms08061}, which has been identified and patched in Microsoft security bulletins ms08-061. The pseudo-code reassembles to a Win32k system call, and the red part shows the vulnerable data's trace.  The user program passes \texttt{lParam} to \texttt{win32k\_function()} through upper layer APIs.  Adding \texttt{my\_struct->cbData} to \texttt{cbCapture} is where the kernel first gets this user-mode variable and allocates a buffer based on its value. Notice, although there is a local variable called \textit{capture}, the developer forgot to use it subsequently.  Several instructions after, the kernel reread this user-mode variable when copy data into the new buffer.  An attacker can alter the user-mode variable \texttt{my\_struct->cbData} between the two reads, and especially by enlarging it, a kernel buffer overflow is created.
 
 
 ~\autoref{fig:toctouasm} gives the assembly-code-level exploit simulation.  As a local privilege escalation vulnerability, the attacker can invoke the vulnerable system call as many times as needed to succeed. Meantime, thread one is spawned to race with the kernel, aiming to enlarge the user variable. To generate the buffer overflow, the attacker needs to flip the high bit an odd number of times during the time window.
