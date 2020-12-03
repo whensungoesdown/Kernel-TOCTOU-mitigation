@@ -104,11 +104,12 @@ The VMCS manages aspects of a virtual machine using many data-fields organized i
 In this part, we briefly describe concepts and mechanisms regarding x86 architecture that are used in \name. Some techniques are rarely mentioned in researches but vital to \name. Although IPI and APIC may not technically belong to x86 architecture concepts, we put them here because they are related to the underlying hardware mechanisms.
 
 
-\textbf{\textit{Paging and Virtual Memory.}} On x86 architecture, with the flat or the segmented memory model, linear address space is mapped into the processors' physical memory space either directly or through paging.  Direct mapping is a one-to-one mapping between the linear address and physical address, also known as real-mode. When using the x86 paging mode, the linear address space (often referred to as virtual memory) is divided into pages. For simplicity, we only consider 4KB pages in this paper. The pages of virtual memory are then mapped as needed with physical pages. Memory Management Unit (MMU) is the address translation hardware that automatically translates virtual addresses to physical addresses with a data structure so-called page table. The translation creates the illusion for every process that it has a large flat virtual memory space (4GB on a 32-bit system). 
+\textbf{\textit{Paging and Virtual Memory.}} On x86 architecture, with the flat or the segmented memory model, linear address space is mapped into the processors' physical memory space either directly or through paging.  Direct mapping is a one-to-one mapping between the linear address and physical address, also known as the real-mode. When using the paging mode, the linear address space (often referred to as virtual memory) is composed of pages. For simplicity, we only consider 4KB pages in this paper. The pages are backed with physical pages through the Memory Management Unit (MMU), a hardware component that automatically translates virtual addresses to physical addresses using a data structure called the page table. The translation creates the illusion for each process that it has its own large flat virtual memory space (4GB on a 32-bit system).
 
 
 
-\textbf{\textit{Page Table.}} The Memory Management Unit (MMU) uses page tables to map physical pages to virtual pages~\cite{intelpaging} so that each process in the system can have a flat virtual memory space. Hence each process needs a page table, and the memory used to store the page tables is unignorable. T the system uses a hierarchical page table structure to save memory. As shown in~\autoref{fig:pagetable}, a virtual address splits into three parts. The last 12-bit is the byte offset of the page;  the first two 10-bit are the index to the page table base (CR3) and Page Directory (PD). The table is also composed of 4KB pages where the system swaps out long-time unvisited pages to save physical memory. When walking through the page table, we often encounter a swap-out page, which is not a problem because it will be automatically brought back by a page fault regarding page absence. However, this becomes a problem since we are already in the context of a SMAP page fault. The page swapping process needs the system to read the hard disk, thus more system calls, which inevitably trigger more SMAP exceptions. They eventually cause a dead loop.  Therefore, solving the nested SMAP exceptions is a must, highlighting our hypervisor-based solutions that confine SMAP at the process level.
+\textbf{\textit{Page Table.}} The MMU uses page tables to map physical pages to virtual pages~\cite{intelpaging} so that each process in the system can have a flat virtual memory space. Because each process has a page table, the memory used to store those page tables is unignorable. Therefore the system designs a hierarchical data structure to save physical memory. As shown in~\autoref{fig:pagetable}, a virtual address splits into three parts. The last 12-bit is the byte offset of the page;  the first two 10-bit are the index to the page directory and page table. The page tables are also composed of 4KB pages where the system swaps out the long-time unvisited pages to save physical memory. When walking through the page table, we often encounter a swap-out page, which is not an issue because it will be automatically brought back by a page fault regarding page absence. However, this becomes a problem since we are already in the context of a SMAP page fault. The page swap-in process needs the system to read the hard disk, thus more system calls, which inevitably trigger more SMAP exceptions. Eventually, they may cause a dead loop. Therefore, our hypervisor-based solution that confines SMAP at the process level is essential to solving this issue.
+
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/pagetable}
@@ -118,40 +119,39 @@ In this part, we briefly describe concepts and mechanisms regarding x86 architec
 \end{figure}
 
 
-\textbf{\textit{Translation Lookaside Buffer.}} As mentioned above, page table walking is a lengthy process. A full walk needs to access two pages (PD page and PTE page). If any of the two pages are not present in the memory (PDE or PTE invalid), it further triggers a page fault to bring the absent page back.
 
-A Translation Lookaside Buffer (TLB) is part of MMU, and it is a memory cache used to reduce the time to access virtual memory. The TLB has a fixed number of slots that stores the recent translations of virtual memory to physical memory and permission bits. If a valid TLB entry exists, the processor will not walk the page table trying to find the PTE. The system kernel is responsible for the consistency between TLB and the page tables.
+\textbf{\textit{Translation Lookaside Buffer.}} As mentioned above, page table walking is a lengthy process. A full walk needs to access two pages (PD page and PT page). If any of the two pages are not present in the memory, it further triggers a page fault to bring the absent page back.
 
-
-\textbf{\textit{Interrupt Descriptor Table.}} The Interrupt Descriptor Table (IDT) is a data structure used on the x86 architecture to implement an interrupt vector table. The processor uses the IDT to determine the correct response to interrupts and exceptions. IDTR is the register on each processor to store the address of the IDT.
+A Translation Lookaside Buffer (TLB) is part of MMU, and it is a memory cache used to reduce the time to access virtual memory. The TLB has a fixed number of slots that stores the recent translations of virtual memory to physical memory and permission bits. If a valid TLB entry exists, the processor will not walk the page table trying to find the Page Table Entry (PTE). The system kernel is responsible for the consistency between TLB and the page tables.
 
 
-The fundamental microarchitectural difference between interrupt and exception is as follows.  An interrupt is an asynchronous event
-that is typically triggered by an I/O device. An exception is a
-synchronous event generated when the processor detects one
-or more predefined conditions while executing an instruction. However, one thing in common is that their handlers are all in the IDT, making them easily confused.
+\textbf{\textit{Interrupt Descriptor Table.}} The Interrupt Descriptor Table (IDT) is a data structure used on the x86 architecture to implement an interrupt vector table. The processor uses the IDT to determine the correct response to interrupts and exceptions.
 
-Furthermore, exceptions are classified as \textbf{faults}, \textbf{traps}, and \textbf{aborts} depending on the way they are reported and whether the instruction that caused the exception can be restarted without loss of program or task continuity. Aborts are not recoverable. They are used to report severe errors, such as hardware errors and inconsistent or illegal values in system tables. Faults and traps are recoverable, and the main difference between them is that when recovers from faults, the return address is the faulting instruction. On the other side, the trap's return address points to the instruction to be executed after the trapping instruction. In our case, the SMAP exception is a fault and handled through the page fault handler.
+
+
+\textbf{\textit{Interrupt and Exception.}} The fundamental difference in microarchitectural between interrupt and exception is as follows.  An interrupt is an asynchronous event that is typically triggered by an I/O device. An exception is a synchronous event generated when the processor detects one or more predefined conditions while executing an instruction. However, one thing in common is that their handlers are all in the IDT, making them easily confused.
+
+Furthermore, exceptions are categorized as \textbf{faults}, \textbf{traps}, and \textbf{aborts} depending on the way they are raised and whether the instruction that caused the exception can be restarted without loss of program or task continuity. Aborts are not recoverable. They are used to report severe errors, such as hardware errors and inconsistent or illegal values in system tables. Faults and traps are recoverable, and the main difference between them is that when recovers from faults, the return address is the faulting instruction; the trap's return address points to the instruction after the trapping instruction. In our case, the SMAP exception is a fault and handled through the page fault handler.
 
 The IDT has 256 entries. Entry 0-31 are for exceptions, except entry two is for Non-Maskable external Interrupt (NMI). The rest is for external interrupts from INTR pin or \texttt{INT n} instruction. However, \texttt{INT n} also known as a software interrupt. It is essentially an exception with \textit{interrupt} in its name, and its vector located with other external hardware interrupt vectors. Fun.
 
 
 
-\textbf{\textit{Trap Frame.}}  The processor pushes the trap frame data structure into the kernel stack when an interrupt or exception occurs.
-It contains part of the faulting thread's registers. In the context of a page fault, the trap frame contains ErrorCode, CS: EIP, EFLAGS, and SS: ESP. The SS: ESP is included based on whether the CS register's current privacy level (CPL) changes. 
+\textbf{\textit{Trap Frame.}}  The trap frame is a data structure that the processor pushed into the kernel stack when an interrupt or exception occurs. It contains part of the faulting thread's registers. In the context of a page fault, the trap frame contains ErrorCode, CS: EIP, EFLAGS, and SS: ESP. The SS: ESP is included based on whether the CS register's current privacy level (CPL) changes.
 
 
 
-\textbf{\textit{Gate.}} Code modules in lower privilege segments can only access modules operating at higher privilege segments through a tightly controlled and protected interface called a \textbf{gate}.  There are four types of gate, namely, \textbf{task gate}, \textbf{trap gate}, \textbf{interrupt gate}, and \textbf{call gate}. Fully describe and distinguish them is out of the paper's scope. The project only involves the interrupt gate.
+\textbf{\textit{Gate.}} Code modules in lower privilege can only access higher privilege modules through a tightly controlled and protected interface called a \textbf{gate}.  There are four types of gate, namely, \textbf{task gate}, \textbf{trap gate}, \textbf{interrupt gate}, and \textbf{call gate}. Fully describe and distinguish them is out of the paper's scope. The project only involves the interrupt gate.
 
-The vectors in the IDT go through either the interrupt gate or trap gate. The difference is subtle. If the interrupt or exception handler is called through an interrupt gate, the processor clears the interrupt flag (IF) in the EFLAGS register to prevent subsequent interrupts from interfering with the handler's execution.  When through a trap gate, the processor does not change the IF flag. Setting the interrupt flag is a requirement to control stack depth, which also involves the type of interrupt controller installed in the system. We observed that the processor invokes the page fault handler through an interrupt gate, and we think the reason for that is as follows. The processor loads the CR2 register with the faulting virtual address that caused the exception. If the interruption is allowed in the processor, the page fault handler may be swapped out, and another page fault occurs subsequently and overwrites the CR2. 
-
-
-
-\textbf{\textit{CS Segment and Current Privilege Level}} Unlike other segment registers, the CS segment register cannot be set directly using instruction such as \texttt{mov},  but only through a trap or an interrupt gate.  The processor maintains the Current Privilege Level (CPL) field in the CS segment. Thus it is always equal to the processor's current privilege level. The CS register of the trap frame provides us the privilege of the code when the SMAP exception happens. Therefore we do not make decisions based on the apparent value of EIP.
+The vectors in the IDT go through either the interrupt gate or trap gate. The difference is subtle. If the interrupt or exception handler is called through an interrupt gate, the processor clears the interrupt flag (IF) in the EFLAGS register to prevent subsequent interrupts from interfering with the handler's execution.  On the other side, when through a trap gate, the processor does not change the IF flag. Setting the interrupt flag is a requirement to control stack depth, which also involves the type of interrupt controller installed in the system. We observed that the processor invokes the page fault handler through an interrupt gate, and we think the reason for that is as follows. The processor loads the CR2 register with the faulting virtual address that caused the exception. If the interruption is allowed in the processor, a thread context switch may swap out the page fault handler, and another page fault occurs subsequently and overwrites the CR2.
 
 
-\textbf{\textit{Inter-processor Interrupt.}}  It is an interrupt controller mechanism to interrupt another processor or group of processors on the system bus. They are used for software self-interrupts, interrupt forwarding, or preemptive scheduling. In \name, we use IPI to flush TLB cache on all the processors.
+
+\textbf{\textit{CS Segment and Current Privilege Level.}} Unlike other segment registers, the CS segment register cannot be set directly using instruction such as MOV,  but only through a trap or an interrupt gate.  The processor maintains the Current Privilege Level (CPL) field in the CS segment. Thus it is always equal to the processor's current privilege level. The CS register of the trap frame provides us the privilege of the code when the SMAP exception happens. Therefore, we do not make decisions based on EIP's apparent value, making the mitigation more reliable.
+
+
+\textbf{\textit{Inter-processor Interrupt.}}  It is an interrupt controller mechanism to interrupt another processor or group of processors on the system bus. They are used for software self-interrupts, interrupt forwarding, or preemptive scheduling. In \name, we use IPI to flush the TLB cache on all the processors.
+
 
 %\textbf{\textit{Local APIC.}} Intel's Advanced Programmable Interrupt Controller (APIC) is a family of interrupt controllers. It is more advanced than Intel's 8259 Programmable Interrupt Controller (PIC). Nowadays, SMP systems with multiple processors utilize APIC. The APIC is a split architecture design, with a local APIC usually integrated into the processor and an optional I/O APIC on a system bus. The local APIC performs two primary functions for the processor:
 %It receives interrupts from the processor's interrupt pins, internal sources, and an external I/O APIC. It sends these to the processor core for handling.
@@ -181,18 +181,23 @@ The vectors in the IDT go through either the interrupt gate or trap gate. The di
 
 
 
-\textbf{\textit{Local APIC.}} Intel's Advanced Programmable Interrupt Controller (APIC) is a family of interrupt controllers. Nowadays, multi-processor systems utilize APIC instead of the obsoleted Intel 8259 Programmable Interrupt Controller (PIC). The APIC is a split architecture design, with a local APIC integrated into the processor and the I/O APIC on the system chipset. The local APIC receives interrupts from various sources such as I/O APIC and sends them to the processor. It also receives/sends IPI messages from/to other processors on the system bus. The I/O APIC is responsible for receiving interrupts generated by I/O devices and forwarding them to the local APIC. 
-
-A processor can program the local APIC's interrupt command register (ICR) to send out IPIs. The target local APIC receives the IPI message and calls the processor's IDT vector according to the information that comes with it, such as the vector number and trigger mode. Local APIC registers are memory-mapped to a 4-KByte region of the processor's physical address space with an initial starting address at 0xEFF00000. The system software interacts with a local APIC through memory-mapped I/O. 
+\textbf{\textit{Inter-processor Interrupt.}}  It is an interrupt controller mechanism to interrupt another processor or group of processors on the system bus. They are used for software self-interrupts, interrupt forwarding, or preemptive scheduling. In \name, we use IPI to flush the TLB cache on all the processors.
 
 
-\begin{figure}[th]
-  \includegraphics[width=0.47\textwidth]{figures/icr2}
-  \centering
-  \caption{Interrupt Command Register (ICR). Notice, Intel and AMD has slightly different definitions.~\cite{intelapic}~\cite{amdapic}}
-  \label{fig:icr}
-\end{figure}
+\textbf{\textit{Local APIC.}} Intel's Advanced Programmable Interrupt Controller (APIC) is a family of interrupt controllers. Nowadays, multi-processor systems utilize APIC instead of the obsoleted Intel 8259 Programmable Interrupt Controller (PIC). The APIC is a split architecture design, with a local APIC integrated into the processor and the I/O APIC on the system chipset. The local APIC receives interrupts from various sources such as I/O APIC then sends them to the processor, and it also receives/sends IPI messages from/to other processors on the system bus. On the other side, the I/O APIC is responsible for receiving interrupts generated by I/O devices and forwarding them to the local APIC.
+
+A processor can program the local APIC's interrupt command register (ICR) to send out IPIs. The target local APIC receives the IPI message and calls the processor's IDT vector according to the information that comes with it, such as the vector number. Local APIC registers are memory-mapped to a 4-KByte region of the processor's physical address space with an initial starting address at 0xEFF00000. The system software interacts with it through memory operations.
 
 
+% uty: test  when need to shrink text, the following can go
 
-~\autoref{fig:icr} shows a 64-bit local APIC register.  In our case, the \textit{Message Type} should be \textit{Fixed} and the \textit{VECTOR} is the IDT slot that we use to handle this IPI.
+%\begin{figure}[th]
+%  \includegraphics[width=0.47\textwidth]{figures/icr2}
+%  \centering
+%  \caption{Interrupt Command Register (ICR). Notice, Intel and AMD has slightly different definitions.~\cite{intelapic}~\cite{amdapic}}
+%  \label{fig:icr}
+%\end{figure}
+%
+%
+%
+%~\autoref{fig:icr} shows a 64-bit local APIC register.  In our case, the \textit{Message Type} should be \textit{Fixed} and the \textit{VECTOR} is the IDT slot that we use to handle this IPI.
