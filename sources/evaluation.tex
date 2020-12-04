@@ -3,12 +3,12 @@
 \section{Evaluation}
 \label{sec:ktoctou-evaluation}
 
-In this section, we evaluate \name's performance overhead and how it protects the operating system from real-world vulnerabilities.
+This section, we evaluate \name's performance overhead and how it protects the operating system from real-world vulnerabilities.
 
 
 \subsection{Performance}
 In this section, we focus on performance evaluation.
-As previously mentioned, \name has two key components, the system module and the hypervisor. To present the performance impact introduced by this mitigation, we conduct the tests in three parts. 
+As previously mentioned, \name has two key components, the system module, and the hypervisor. To present the performance impact introduced by this mitigation, we conduct the tests in three parts. 
 
 All tests run on the PC with Intel Core i5-6400 (6th Gen CPU Skylake), ASUS H110M-C motherboard (Intel H110 Chipset, Realtek RTL8111H Network Controller), 8GB RAM, and 500GB hard disk.
 
@@ -99,7 +99,7 @@ We also count the number of reads and writes on user pages. For non-GUI programs
 
 % for later reference
 %Buffered I/O
-%The operating system creates a nonpaged system buffer, equal in size to the application's buffer. The I/O manager copies user data into the system buffer for write operations before calling the driver stack. For read operations, the I/O manager copies data from the system buffer into the application's buffer after the driver stack completes the requested operation.
+%The operating system creates a nonpaged system buffer, equal in size to the application's buffer. The I/O manager copies user data into the system buffer for write operations before calling the driver stack. The I/O manager copies data from the system buffer into the application's buffer after the driver stack completes the requested operation for read operations.
 %
 %Direct I/O
 %The operating system locks the application's buffer in memory. It then creates a memory descriptor list (MDL) that identifies the locked memory pages and passes the MDL to the driver stack. Drivers access the locked pages through the MDL.

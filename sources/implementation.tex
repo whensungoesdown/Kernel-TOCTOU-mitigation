@@ -8,7 +8,7 @@
 This section provides the implementation details and discusses the issues that we encountered during the development.
 
 
-\textbf{\textit{Page Faults.}} Exception handling is the primary method of \name. We leverage SMAP exception to notify us when the kernel accesses userspace and use privilege-violation exceptions to solve the subsequent read and write conflicts. Those exceptions are all handled through the page fault handler, vector 14, in the IDT. The page fault is not an error but an exception raised when accessing a virtual page. It is the MMU's mechanism to implement virtual memory; thus, the page fault is recoverable.
+\textbf{\textit{Page Faults.}} Exception handling is the primary method of \name. We leverage SMAP exception to notify us when the kernel accesses userspace and use privilege-violation exceptions to solve the subsequent read and write conflicts. Those exceptions are all handled through the page fault handler, vector 14, in the IDT. The page fault is not an error, but an exception raised when accessing a virtual page. It is the MMU's mechanism to implement virtual memory; thus, the page fault is recoverable.
 
 We handle page fault exceptions before the kernel because, by design, the SMAP exception indicates a fatal error that the system should stop working immediately. We also must be cautious about sending all the mitigation-irrelevant exceptions to the kernel. If we miss one, it may lead to system malfunctioning or crash processes.
 

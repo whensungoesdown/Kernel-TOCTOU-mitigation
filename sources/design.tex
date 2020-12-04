@@ -3,7 +3,7 @@
 \section{\name Design}
 \label{sec:ktoctou-design}
 
-This section presents the design of \name.  The core of \name includes two key components, the system module and the hypervisor. The system module intercepts the system's page fault handler to process SMAP and relevant exceptions, which is the protection's main logic. The lightweight hypervisor puts the system into the virtual machine. Its primary use is to confine the system-wide feature SMAP into specific processes.
+This section presents the design of \name.  The core of \name includes two key components, the system module, and the hypervisor. The system module intercepts the system's page fault handler to process SMAP and relevant exceptions, which is the protection's main logic. The lightweight hypervisor puts the system into the virtual machine. Its primary use is to confine the system-wide feature SMAP into specific processes.
 
 \subsection{System Module}
 
