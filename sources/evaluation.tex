@@ -161,14 +161,12 @@ To promote the performance of \name, it would be helpful if  the unnecessary SMA
 \subsection{Case Study}
 
 
-\textbf{\textit{CVE-2008-2252}} is a bug reported by Thomas Garnier in 2008 and fixed by Microsoft as part of the MS08-061 security bulletin.  It is a typical TOCTOU vulnerability addressed in many previous research works~\cite{wang2019dftracker}~\cite{jurczyk2013identifying}. To evaluate the effectiveness of our mitigation, we want to test it on a real hardware machine. SMAP and SMEP are only available on a relatively new processor, Intel 5 generation CPU (architecture code name Broadwell). It is troublesome to install the Windows XP operating system on a modern PC. The chipset with an integrated hard disk controller no longer supports IDE mode, and Windows XP does not support the advanced host controller interface (AHCI) either. For us, we need an additional AHCI driver for Windows XP and a tool to virtualize a floppy drive~\cite{installxpskylake} to provide it during the installation.
+\textbf{\textit{CVE-2008-2252}} is a kernel-level TOCTOU vulnerability reported by Thomas Garnier in 2008 and patched in Microsoft security bulletins ms08-061.  It has been analyzed by many research works~\cite{wang2019dftracker}~\cite{jurczyk2013identifying}. To evaluate the effectiveness of \name, we test it on a real hardware machine. Since SMAP and SMEP are only available on a relatively new processor, we have to install an old system on a modern PC. 
 
-We write a proof-of-concept (POC) program to exploit the CVE-2008-2252 vulnerability. If it flips the user-mode variable between the two kernel fetches, it will create a memory buffer overflow in the kernel. We test it against our mitigation in a multi-processor system.
+%It is troublesome to install Windows XP because the chipset with an integrated hard disk controller no longer supports IDE mode, and Windows XP does not support the advanced host controller interface (AHCI) either. For us, we need an additional AHCI driver for Windows XP and a tool to virtualize a floppy drive~\cite{installxpskylake} to provide it during the installation.
 
 
-
-The exploit creates two threads. Thread 0 first allocates a virtual page at address 0 then uses it as the parameter for the vulnerable system call. Using page zero is a necessity to bypass the sanity check of the system call NtUserMessageCall(). Then, it repeatedly calls the upper layer vulnerable Win32 API \texttt{SendMessage()} (\texttt{WM\_COPYDATA}) with the malicious parameters. \texttt{SendMessage()} calls a lower layer function \texttt{NtUserMessageCall()}, which eventually calls the vulnerable win32k internal function \texttt{xxxInterSendMsgEx()}. Meantime, thread 1 keeps flipping the key variable on page zero simultaneously.
-
+We write a program to exploit the CVE-2008-2252 vulnerability. To create a buffer overflow in the kernel, we need to enlarge the user-mode variable between the two kernel reads.  The exploit creates two threads. Thread zero first allocates a virtual page at address zero for the parameters, which is necessary to bypass the sanity check of the system call \texttt{NtUserMessageCall()}. Then, it repeatedly calls the upper layer Win32 API \texttt{SendMessage()} (\texttt{WM\_COPYDATA}) with the malicious parameters to open the attack time window. \texttt{SendMessage()} calls a lower layer function \texttt{NtUserMessageCall()}, which eventually calls the vulnerable win32k internal function \texttt{xxxInterSendMsgEx()}. Simultaneously, thread one keeps flipping the high bit of the target variable on page zero.
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/ms08061case2}
@@ -178,24 +176,22 @@ The exploit creates two threads. Thread 0 first allocates a virtual page at addr
 \end{figure}
 
 
-As shown in~\autoref{fig:ms08061case}, the kernel reads the user-mode variable at address 0x4 twice at \texttt{\textcircled{2}} and \texttt{\textcircled{3}}. Any data changes during this time will cause data inconsistency in the kernel. Therefore it is the time window for the attack. The attack thread tries to enlarge the value read at \texttt{\textcircled{3}}. Our protection needs to cover the entire attack time window so that the attack thread can not change the variable during it. In this case, at \texttt{\textcircled{1}}, several instructions before \texttt{\textcircled{3}}, the CMP instruction operates on page zero, raising a SMAP exception. Our page fault handler sets this page to kernel-mode until the current \texttt{NtUserMessageCall()} ends, which covers the entire attack time window. When thread 1 tries to write the protected page, it raises a page fault exception, and our page fault handler suspends the thread, waiting for the release of the page.
+
+As shown in~\autoref{fig:ms08061case}, the kernel reads the user-mode variable (address 0x4) at \texttt{\textcircled{2}} and \texttt{\textcircled{3}}. Between the two instructions is the attack window within which thread one tries to enlarge the variable. To successfully mitigate the attack, we need to ensure this page remains unchanged during the time. The protection starts at \texttt{\textcircled{1}}, several instructions before \texttt{\textcircled{2}}, where the CMP instruction first reads the page hence raise an SMAP exception. The protection continuously effective until the current system call \texttt{NtUserMessageCall()} ends. It covers the entire attack window. When thread one tries to tamper with the variable, it inevitably triggers a page fault regarding privilege violation. The page fault handler then suspends thread one until the system call ends, making it miss the opportunity.
 
 
 
-
-\textbf{\textit{CVE-2013-1254.}} Similar to the one above mentioned, CVE-2013-1254~\cite{CVE-2013-1254} is another typical TOCTOU vulnerability. It is a family of 27 distinct vulnerabilities~\cite{ms13016}~\cite{jurczyk2013identifying} in the win32k module. It affects a variety of operating systems from Windows XP to Windows Server 2012.
-
+\textbf{\textit{CVE-2013-1254.}} Similar to the vulnerability above mentioned, CVE-2013-1254~\cite{CVE-2013-1254} is another typical TOCTOU vulnerability. It is a family of 27 distinct vulnerabilities~\cite{ms13016}~\cite{jurczyk2013identifying} in the win32k module. It affects a variety of operating systems from Windows XP to Windows Server 2012.
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/cve-2013-1254}
   \centering
-  \caption{The family of the 27 vulnerabilities in the win32k module is mostly around the parameter sanity check. The checking code with \texttt{\_W32UserProbeAddress} makes sure that the parameters passed in reside in userspace. It is a classic time-to-check-to-time-to-use. When checking, the \texttt{[exc+8]} is less than \texttt{\_W32UserProbeAddress}, when using, it could change to a kernel address by another user-mode thread. Furthermore, the malicious address that passed the sanity check may point to an essential kernel data structure, hence gives the attacker kernel write capability.}
+  \caption{The family of the 27 vulnerabilities in the win32k module is mostly around the parameter security check. The checking code with \texttt{\_W32UserProbeAddress} makes sure that the parameter is from userspace. It is a classic time-of-check-to-time-of-use. When checking, the value is benign where \texttt{[exc+8]} is less than \texttt{\_W32UserProbeAddress}. After that, the attack can replace it with a malicious one before the second read.}
   \label{fig:cve-2013-1254}
 \end{figure}
 
 
-They have the same patterns. The code is mostly around the \texttt{\_W32UserProbeAddress}, which is a value that indicates the highest possible address for user-mode variables. ~\autoref{fig:cve-2013-1254}shows that the flawed code in red first gets the value from \texttt{ecx+8} and compare it with \texttt{\_W32UserProbeAddress}; afterward, it gets the data again to \texttt{eax}, which is the second fetch. An attacker can abuse this, changing the value to bypass the parameter sanity check, for example, send in a kernel-mode address.
 
+These vulnerabilities share a similar pattern. The code is part of the parameters security check, around \texttt{\_W32UserProbeAddress}, which is the highest possible address for user-mode data. ~\autoref{fig:cve-2013-1254} shows that the flawed code first compares it with the passed in parameters' address, which is \texttt{ecx+8}. Only if the address is legit will the kernel uses it. However, after passing the security check, the kernel mistakenly reread the address. The attacker can abuse this, first pass the security check, then replace the address with a malicious one, such as a kernel-mode address, which may lead to an arbitrary kernel write vulnerability depending on the case.
 
-When the instruction \texttt{cmp [ecx+8], eax} triggers the SMAP exception, our mitigation protects this page until the current system call ends. Therefore, the kernel gets the same data at the second fetch.
-
+The protection takes effect when the instruction \texttt{cmp [ecx+8], eax} triggers the SMAP exception. The page is protected, and the kernel gets the same value at the second read.
