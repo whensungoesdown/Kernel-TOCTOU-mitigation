@@ -14,16 +14,15 @@ Considering we leverage a hardware feature from the Intel processor, The host sy
 
 \subsection{High-Level Design and Challenges}
 
-The kernel double fetching a user address may cause a TOCTOU vulnerability. From a practical point of view, we can not make the kernel change its double-fetch behavior. Instead, we want to make the two fetches always get the same value, thus no vulnerability. The high-level idea is as follows.  When the kernel accesses a user address, we freeze the containing page so that no other user thread can overwrite it.
+The kernel double fetching a user address may cause a TOCTOU vulnerability. There are two ways to prevent exploitation; one is to drop the kernel's double-fetch action; the other is to prevent data mismatch between fetches. From a practical point of view, we can not decline the kernel's double-fetch behavior. Therefore, this paper proposes a framework to prevent data mismatch between fetches. The high-level idea is that when the kernel accesses a user address, we freeze the containing page so that no other user thread can overwrite it.
 
-
-The main challenges are:
+However, there have been many challenges here:
 
 \begin{itemize}
 	\item How can we know when the kernel accesses a user address?
-	\item It is overkill to freeze an entire page just for one variable, and reads should allow.
+	\item It is overkill to freeze an entire page just for one variable and reads should allow.
 	\item The two fetches should happen within a short time, more specifically, within the same system call.
-	\item Windows is a complex operating system, if not the most complex system. How is it practical to enable a system-wide hardware feature such as SMAP without crash the system?
+	\item Windows is a complex operating system. How can we practically enable a system-wide hardware feature such as SMAP without crashing the system?
 \end{itemize}
 
 
