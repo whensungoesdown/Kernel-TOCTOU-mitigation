@@ -10,11 +10,12 @@ In this section, we evaluate \name's performance overhead and how it protects th
 In this section, we focus on performance evaluation.
 As previously mentioned, \name has two key components, the system module and the hypervisor. To present the performance impact introduced by this mitigation, we conduct the tests in three parts. 
 
-All tests run on the PC with Intel Core I5-6400 (6 GEN CPU Skylake), ASUS H110M-C motherboard (Intel H110 Chipset, Realtek RTL8111H Network Controller), 8GB RAM, and 500GB hard disk.
+All tests run on the PC with Intel Core i5-6400 (6th Gen CPU Skylake), ASUS H110M-C motherboard (Intel H110 Chipset, Realtek RTL8111H Network Controller), 8GB RAM, and 500GB hard disk.
 
 \textbf{\textit{Benchmarks.}} The hypervisor plays an essential part in \name. Without the hypervisor confining the SMAP feature, it would not be possible to debug a complex system like Windows with a system-wide unsupported feature. Nowadays, a hypervisor is part of the cloud computing infrastructure and can be regarded as a built-in component. The Windows 10 operating system even brings its native hypervisor to deliver security goals. Under those circumstances, \name can be added to the existing hypervisor with less performance overhead imposed on the system. 
 
-To evaluate the hypervisor's performance overhead, we use the well-known benchmark SPEC 2006. We understand that this benchmark is for processor instruction evaluation, specifically for microarchitectural aspects, such as instruction execution, branch prediction accuracy, cache policies. We choose several programs from the set. They are all non-GUI and computational intensive programs. Therefore the performance overhead incurred is primarily due to the hypervisor. Although our hypervisor and Windows HVCI have different objectives, we compare them to show that run-time protection utilizes virtualization techniques is practical.
+
+To evaluate the hypervisor's performance overhead, we use the well-known benchmark SPEC 2006. We understand that this benchmark is for processor instruction set evaluation, specifically for microarchitectural aspects, such as instruction execution, branch prediction accuracy, cache policies. We choose several programs from the set. They are all non-GUI and computational intensive programs. Therefore the performance overhead incurred is primarily due to the hypervisor. Although our hypervisor and Windows HVCI have different objectives, we compare them to show that run-time protection utilizes virtualization techniques is practical.
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/benchmark3}
@@ -31,10 +32,9 @@ To evaluate the hypervisor's performance overhead, we use the well-known benchma
 Our hypervisor is slower than HVCI, particularly in two benchmark programs. Learning more about computer architecture and virtualization techniques, we wish to improve our hypervisor to perform better.
 
 
+\textbf{\textit{Non-trivial Applications.}} We also evaluate \name on several non-trivial applications, as shown in~\autoref{fig:ktoctou-performance}. The applications we choose are meaningful because the kernel-TOCTOU vulnerability may threaten them in real-world scenarios. For example, a web server such as Nginx normally runs in a non-root account and takes external requests.
 
-\textbf{\textit{Non-trivial Applications.}} We also evaluate \name on several non-trivial applications, as shown in~\autoref{fig:ktoctou-performance}. The applications we choose are meaningful because the kernel-TOCTOU vulnerability may threaten them. For example, a web server such as Nginx normally runs in a non-root account and takes external requests. 
-
-To test web servers, we count their response time for a web request. For compression software, the test is to compress large files. We also use speedtest1.c, which is a performance testing program for sqlite3. The result shows that the performance overhead is acceptable. 
+To test web servers, we count their response time for a web page request. For compression software, the test is to compress large files. We use speedtest1.c, which is a performance testing program for sqlite3. The result shows that the performance overhead is acceptable.
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/performance4}
@@ -47,7 +47,9 @@ To test web servers, we count their response time for a web request. For compres
 
 
 
-\textbf{\textit{GUI.}} Through our investigation, we find that the Windows graphical subsystem, namely, Win32k.sys, has the most double-fetch issues.  Because GUI programs need to redraw their graphical components frequently, they invoke the win32k system calls a lot, even for a simple program such as Windows notepad. Therefore,  our mitigation incurs an unneglectable performance over GUI programs. The overhead is primarily affected by how often the interface is refreshed. For example, if minimizing a GUI program's window, its performance will not be slow down by the graphical interface at all. We compare GUI programs with non-GUI programs in the following aspects: the number of user pages accessed by kernel per system call and how many double fetches occur. We drag the GUI program's window to trigger redraw, and we send one URL request to the web servers per second. The measurement takes the first 500 system calls.
+\textbf{\textit{GUI.}} Through our investigation, we find that the Windows graphical subsystem, namely, Win32k.sys, has the most double-fetch issues.  Since GUI programs need to redraw their graphical components, they invoke the win32k system calls in a high frequency, even for a simple program such as Windows notepad. Therefore,  our mitigation incurs an unneglectable performance over GUI programs. The overhead is primarily affected by how often the interface refreshes. For example, if minimizing a GUI program's window, its performance will not be slow down by the graphical interface at all. 
+
+We compare GUI programs with non-GUI programs in the following aspects: the number of user pages accessed by kernel per system call and how many double fetches occur. We drag the GUI program's window to trigger redraw, and we send one URL request to the web servers per second. The measurement takes the first 500 system calls.
 
 \vspace*{-\baselineskip}
 \begin{center}
@@ -78,12 +80,11 @@ To test web servers, we count their response time for a web request. For compres
 \end{center}
 \vspace*{-\baselineskip}
 
-\autoref{table:pages} shows some interesting results. Refreshing the GUI takes tremendous system calls. As expected, both the kernel and the Win32k subsystem accesses user pages, but the win32k accesses more than the kernel. They both \textit{capture} the user parameters at each system call, but the win32k module read/write more user data even in the middle of a system call.
+
+\autoref{table:pages} shows some interesting results. Refreshing the GUI takes tremendous system calls. As expected, both the kernel and the Win32k subsystem accesses user pages, but the win32k accesses more than the kernel does. We find that they both \textit{capture} the user parameters at the beginning of each system call through reverse engineering, but the win32k module read/write user data even in the middle of a system call.
 
 
-We also count the number of reads and writes on user pages. For non-GUI programs, the number of writes is zero, which is strange because most system calls need to write results back to the user program. With investigation, the causes are as follows. Windows provides three methods to transfer data between system calls and user programs, namely, Buffered I/O, Direct I/O, and Neither Buffered Nor Direct I/O. Among the three, the kernel mostly uses Buffer I/O and Direct I/O, which do not need to write to user-mode buffer directly. However, the kernel still needs to write user-mode variable such as the filehandle in system call \texttt{NtCreateFile}.
-~\autoref{fig:probecode} shows the pseudo-code similar to what the kernel uses to validate user parameters. We can see that the code always reads the variable first and the SMAP exception only captures first access. Therefore, this coding style is another cause for the zero writes. The results show the kernel is well regulated on accessing user data. On the other side, the Win32k module has many writes, which tell a different story.
-
+We also count the number of reads and writes on user pages. For non-GUI programs, the number of writes is zero, which is strange because most system calls need to write results back to the user program. With investigation, the causes are as follows. Windows provides three methods to transfer data between system calls and user programs, namely, Buffered I/O, Direct I/O, and Neither Buffered Nor Direct I/O. Among the three, the kernel mostly uses Buffer I/O and Direct I/O, which do not need to write to user-mode buffer directly. However, the kernel still needs to write user-mode variables such as the filehandle in system call \texttt{NtCreateFile()}.~\autoref{fig:probecode} shows the pseudo-code similar to what the kernel uses to validate user parameters. We can see that the code always reads the variable first and the SMAP exception only captures first access. Therefore, this coding style is another cause for the zero writes. The result shows that the kernel is well regulated on accessing user data. On the other side, the Win32k module has many writes, which tell a different story.
 
 \begin{figure}[th]
   \includegraphics[width=0.47\textwidth]{figures/probecode}
@@ -109,10 +110,9 @@ We also count the number of reads and writes on user pages. For non-GUI programs
 
 
 
+The column \textit{Double Fetch} lists the user addresses that are read more than once during individual system calls. We trace this information with the \toolname as previously introduced in~\autoref{sec:ktoctou-experiment}. Many of those double-fetch records are duplicates and benign. For example, the kernel needs to read data from Process Environment Block (PEB) or Thread Environment Block (TEB), or data structures located in userspace.  However, the Win32k module has many more cases. ~\autoref{table:doubleread} gives a glimpse of them. Every two rows indicate a double-fetch case, where after the first read, the subsequent instruction revisits the same address shortly after, and the identical CR3 and TEB show that two fetches are from the same thread of the same process.
 
-The column \textit{Double Fetch} shows the user-addresses that are read more than once during individual system calls. We trace this information with the fuzzing tool as previously introduced in~\autoref{sec:ktoctou-experiment}. Many of those double-fetch records are duplicates and benign. The kernel needs to read data from Process Environment Block (PEB) or Thread Environment Block (TEB), data structures located in userspace.  However, the Win32k module has many more cases. ~\autoref{table:doubleread} gives a glimpse of them. Every two rows indicate a double-fetch case, where after the first read, the subsequent instruction revisits the same address shortly after, and the identical CR3 and TEB show that two fetches are from the same thread of the same process.
-
-Furthermore, with reverse-engineering effort, we find that the Win32k module directly read the user variable and without the protection of a try-catch block in some of those cases. It is dangerous. The user programs can free the user memory and cause the kernel code to access an invalid page without protection, which leads to a crash.
+Furthermore, we find that the Win32k module directly read the user variable not within a try-catch block in some of those cases. It is dangerous. The user programs can free the user memory and cause the kernel code to access an invalid page without protection, which leads to a kernel crash.
 
 
 \vspace*{-\baselineskip}
@@ -120,7 +120,7 @@ Furthermore, with reverse-engineering effort, we find that the Win32k module dir
 	\begin{table}[ht]
 		\small
 		%\renewcommand{\arraystretch}{1.2}
-		\caption{In the selected double-fetch results, for every two lines, they have the same CR3 and TEB, which indicate the two records are from the same process, same thread. The two EIP are shortly apart, but the addresses they reference are the same and from userspace.}
+		\caption{In the selected double-fetch results, for every two lines, they have the same CR3 and TEB, which indicate the two records are from the same process, same thread. The two EIP are shortly apart, but the addresses they reference are the same user-mode address.}
 		\label{table:doubleread}
 		\centering
 		%\begin{tabular}{ l l l l }
@@ -154,7 +154,9 @@ Furthermore, with reverse-engineering effort, we find that the Win32k module dir
 
 %Although we use virtualization techniques, but the hypervisor we use is a very simple one. Unlike commercial virtualization solutions such as VMWare, Xen and Qemu+Kvm, ours doesn't emulate any hardware devices nor intercept further page mapping translate that between host and guest. Only several types of VM-Exit is inevitable such as control register accessing which we do need to handle it too.
 
-Considering the kernel is fully aware of the untrustworthy user-supplied parameters, we believe it is practical to eliminate the SMAP exceptions during parameter validating. It will promote the performance of mitigation. As was done with the Linux kernel, the SMAP feature is temporarily disabled during \texttt{copy\_from\_user()} and \texttt{copy\_to\_user()}, the gateways. In Windows kernel, ProbeForRead() and ProbeForWrite() are the equivalent of that. However, such "Probe" has many variants. For example, ProbeAndWriteHandle(), ProbeForWriteIoStatus(). Some of them are macros instead of functions, making it difficult to change all of them without recompiling the kernel. On the contrary, the code piece that uses user variable is spreading across the module. The repairing process will take great effort. 
+
+
+To promote the performance of \name, it would be helpful if  the unnecessary SMAP exceptions during parameter validating can be eliminated. As was done in the Linux kernel, the SMAP feature is temporarily disabled during \texttt{copy\_from\_user()} and \texttt{copy\_to\_user()}, the gateway functions. In Windows kernel, \texttt{ProbeForRead()} and \texttt{ProbeForWrite()} are the primary cause of SMAP exception. However, such \textit{probe} has many variants such as \texttt{ProbeAndWriteHandle()}, \texttt{ProbeForWriteIoStatus()} and they are only partial of the user-data-copying code. Some of them are macros instead of functions, making it difficult to fix them without recompiling the kernel. 
 
 \subsection{Case Study}
 
