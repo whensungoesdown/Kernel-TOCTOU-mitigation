@@ -7,7 +7,7 @@
 
 \subsection{Kernel-level TOCTOU Vulnerability}
 
-TOCTOU is a type of vulnerability that involves two references on the same variable or system state. The attacker usually passes the first security check with a benign value and then alters it to malicious before the second reference. It is a classic vulnerability, mostly amount file system APIs, which many previous research works have addressed it~\cite{dean2004fixing}~\cite{borisov2005fixing}~\cite{bishop1996checking}~\cite{bishop1995race}~\cite{wei2005tocttou}.
+TOCTOU is a type of vulnerability that involves two references on the same variable or system state. The attacker usually passes the first security check with a benign value and then alters it to malicious before the second reference. It is a classic vulnerability, mostly among file system APIs, which many previous research works have addressed ~\cite{dean2004fixing}~\cite{borisov2005fixing}~\cite{bishop1996checking}~\cite{bishop1995race}~\cite{wei2005tocttou}.
 
 
 TOCTOU also exists in the operating system kernel. Unlike the classic file system TOCTOU that between APIs, kernel-level TOCTOU appears within individual system calls. When a user program invokes a system call, it usually needs to provide parameters, and it is the kernel's responsibility to verify the legitimacy of the parameters and saves a kernel copy for subsequent use. However, the kernel may fail to accomplish that. Due to the developer's coding style or the unawareness of such vulnerability, the kernel routines do not use the kernel copy; instead, fetch the data from userspace again. Even worse, for historical reasons, a kernel module may not fully decouple with the user-mode components; thus, it directly uses user-mode data.
